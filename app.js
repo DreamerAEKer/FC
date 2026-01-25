@@ -354,7 +354,10 @@ const ViewManager = {
                         <span class="material-icons-round">ios_share</span>
                     </button>
 
-                    <h2>${trip.name}</h2>
+                    <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                        <h2 id="trip-title-header" style="cursor: pointer; border-bottom: 1px dotted rgba(0,0,0,0.2); display: inline-block;">${trip.name}</h2>
+                        <span class="material-icons-round" style="font-size: 16px; color: #999;">edit</span>
+                    </div>
                     <p style="color: #666;">${new Date(trip.date).toLocaleDateString('th-TH')}</p>
                     
                     <div class="expense-summary" style="margin-top: 16px; background: var(--primary-gradient); color: white; padding: 24px; border-radius: 20px; box-shadow: var(--shadow-md);">
@@ -396,6 +399,16 @@ const ViewManager = {
         document.getElementById('btn-back-home').addEventListener('click', () => {
             Store.data.currentTripId = null;
             this.renderHome();
+        });
+
+        // Edit Trip Name
+        document.getElementById('trip-title-header').addEventListener('click', () => {
+            const newName = prompt('แก้ไขชื่อทริป:', trip.name);
+            if (newName && newName.trim()) {
+                trip.name = newName.trim();
+                Store.save();
+                this.renderTripDetail(tripId);
+            }
         });
 
         document.getElementById('btn-share-trip').addEventListener('click', () => {
@@ -1380,5 +1393,24 @@ document.addEventListener('DOMContentLoaded', () => {
     window.ViewManager = ViewManager;
 
     Store.init();
+
+    // Header Title Edit Logic
+    const pageTitle = document.getElementById('page-title');
+    if (pageTitle) {
+        if (Store.data.appName) {
+            pageTitle.textContent = Store.data.appName;
+        }
+        pageTitle.addEventListener('click', () => {
+            const currentName = pageTitle.textContent;
+            const newName = prompt('ตั้งชื่อแอปของคุณ:', currentName);
+            if (newName && newName.trim() !== '') {
+                pageTitle.textContent = newName.trim();
+                Store.data.appName = newName.trim();
+                Store.save();
+            }
+        });
+        pageTitle.style.cursor = 'pointer';
+    }
+
     ViewManager.init();
 });
