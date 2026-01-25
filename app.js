@@ -354,11 +354,15 @@ const ViewManager = {
                         <span class="material-icons-round">ios_share</span>
                     </button>
 
-                    <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
-                        <h2 id="trip-title-header" style="cursor: pointer; border-bottom: 1px dotted rgba(0,0,0,0.2); display: inline-block;">${trip.name}</h2>
-                        <span class="material-icons-round" style="font-size: 16px; color: #999;">edit</span>
+                    <div id="trip-title-container" style="display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; padding: 8px; border-radius: 8px; transition: background 0.2s;" 
+                         ontouchstart="this.style.background='rgba(0,0,0,0.05)'" 
+                         ontouchend="this.style.background='transparent'"
+                         onmousedown="this.style.background='rgba(0,0,0,0.05)'" 
+                         onmouseup="this.style.background='transparent'">
+                        <h2 style="border-bottom: 1px dotted rgba(0,0,0,0.2); display: inline-block; margin: 0;">${trip.name}</h2>
+                        <span class="material-icons-round" style="font-size: 18px; color: var(--primary-color);">edit</span>
                     </div>
-                    <p style="color: #666;">${new Date(trip.date).toLocaleDateString('th-TH')}</p>
+                    <p style="color: #666; margin-top: 4px;">${new Date(trip.date).toLocaleDateString('th-TH')}</p>
                     
                     <div class="expense-summary" style="margin-top: 16px; background: var(--primary-gradient); color: white; padding: 24px; border-radius: 20px; box-shadow: var(--shadow-md);">
                         <p style="opacity: 0.9; font-size: 0.9rem;">ยอดรวมทั้งหมด</p>
@@ -401,15 +405,18 @@ const ViewManager = {
             this.renderHome();
         });
 
-        // Edit Trip Name
-        document.getElementById('trip-title-header').addEventListener('click', () => {
-            const newName = prompt('แก้ไขชื่อทริป:', trip.name);
-            if (newName && newName.trim()) {
-                trip.name = newName.trim();
-                Store.save();
-                this.renderTripDetail(tripId);
-            }
-        });
+        // Edit Trip Name (Target the whole container for better mobile touch area)
+        const tripTitleContainer = document.getElementById('trip-title-container');
+        if (tripTitleContainer) {
+            tripTitleContainer.addEventListener('click', () => {
+                const newName = prompt('แก้ไขชื่อทริป:', trip.name);
+                if (newName && newName.trim()) {
+                    trip.name = newName.trim();
+                    Store.save();
+                    this.renderTripDetail(tripId);
+                }
+            });
+        }
 
         document.getElementById('btn-share-trip').addEventListener('click', () => {
             const code = Store.exportTripString(tripId);
