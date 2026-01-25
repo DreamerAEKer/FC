@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Saduak Bab Nee - Convenient Expense Splitting</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&family=Inter:wght@400;500;600&display=swap"
+        rel="stylesheet">
+
+    <!-- Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="app-header">
+            <h1 id="page-title">Saduak Bab Nee</h1>
+            <div class="header-actions">
+                <!-- Dynamic Actions -->
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main id="main-content" class="content-area">
+            <!-- Sections will be injected here by JS -->
+            <div id="home-view" class="view active">
+                <div class="welcome-card">
+                    <h2>ยินดีต้อนรับ!</h2>
+                    <p>เริ่มจัดการค่าใช้จ่ายได้เลย</p>
+                    <button id="btn-create-trip-hero" class="btn btn-primary">
+                        <span class="material-icons-round">add</span> สร้างค่าใช้จ่ายใหม่
+                    </button>
+                </div>
+
+                <div class="section-title">
+                    <h3>ทริปของคุณ</h3>
+                </div>
+                <div id="trip-list" class="trip-list">
+                    <!-- Trip Cards will go here -->
+                    <div class="empty-state">
+                        <p>ยังไม่มีทริป</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Bottom Navigation -->
+        <nav class="bottom-nav">
+            <button class="nav-item active" data-target="home">
+                <span class="material-icons-round">home</span>
+                <span>หน้าหลัก</span>
+            </button>
+            <button class="nav-item" data-target="friends">
+                <span class="material-icons-round">people</span>
+                <span>เพื่อน</span>
+            </button>
+            <button class="nav-item fab" id="btn-quick-add">
+                <span class="material-icons-round">add</span>
+            </button>
+            <button class="nav-item" data-target="activity">
+                <span class="material-icons-round">receipt_long</span>
+                <span>กิจกรรม</span>
+            </button>
+            <button class="nav-item" data-target="profile">
+                <span class="material-icons-round">account_circle</span>
+                <span>ฉัน</span>
+            </button>
+        </nav>
+    </div>
+
+    <!-- Modals / Overlays -->
+    <div id="modal-container"></div>
+
+    <!-- Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
+    <!-- App Script (No module to support local file://) -->
+    <script src="app.js?v=2"></script>
+</body>
+
+</html>
