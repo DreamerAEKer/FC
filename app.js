@@ -818,27 +818,53 @@ const ViewManager = {
         // Regex for currency: 100.00, 1,000.00
         const moneyRegex = /([\d,]+\.\d{2})/;
 
-        let bestAmountLine = -1;
+        // Strategy A: Look for keywords, prioritizing "Net" / "สุทธิ"
+        let foundNet = false;
 
-        // Strategy A: Look for keywords
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i].toLowerCase();
-            if (line.includes('total') || line.includes('รวม') || line.includes('net') || line.includes('amount')) {
-                const match = line.match(moneyRegex);
-                if (match) {
-                    amount = parseFloat(match[1].replace(/,/g, ''));
-                    bestAmountLine = i;
-                }
+
+            // Skip lines that look like specific discounts or tax-only if not desired, 
+            // but primarily skip "Discount" lines to avoid grabbing the discount amount.
+            if (line.includes('ส่วนลด') || line.includes('discount')) continue;
+
+            const match = line.match(moneyRegex);
+            if (!match) continue;
+
+            const val = parseFloat(match[1].replace(/,/g, ''));
+
+            // High Priority: "Net", "สุทธิ"
+            if (line.includes('net') || line.includes('สุทธิ') || line.includes('grand total')) {
+                amount = val;
+                foundNet = true;
+                bestAmountLine = i;
+                // If we found Net, we generally trust it most. 
+                // However, keep looping in case there's a "Net" lower down? 
+                // Usually the last "Net" is the right one.
+            }
+            // Low Priority: "Total", "รวม", "Amount" (Only if we haven't found Net yet)
+            else if (!foundNet && (line.includes('total') || line.includes('รวม') || line.includes('amount'))) {
+                // If we already have a candidate from a previous line (like sub-total),
+                // this might be the grand total or just another sub-total.
+                // Usually the bottom-most "Total" is better, UNLESS it's followed by a Discount line.
+                // But we filtered Discount lines above.
+                amount = val;
+                bestAmountLine = i;
             }
         }
 
-        // Strategy B: If no keyword, look for the largest number at the bottom half (heuristic)
+        // Strategy B: If still no amount, look for the largest number at the bottom half
         if (!amount) {
-            // Check last 5 lines
-            for (let i = lines.length - 1; i >= Math.max(0, lines.length - 10); i--) {
-                const match = lines[i].match(moneyRegex);
+            // Check last 7 lines
+            for (let i = lines.length - 1; i >= Math.max(0, lines.length - 15); i--) {
+                const line = lines[i].toLowerCase();
+                // Safety: Avoid discount lines here too
+                if (line.includes('ส่วนลด') || line.includes('discount') || line.includes('%')) continue;
+
+                const match = line.match(moneyRegex);
                 if (match) {
                     const val = parseFloat(match[1].replace(/,/g, ''));
+                    // Logic: The total is usually the largest number on the receipt
                     if (val > (amount || 0)) {
                         amount = val;
                     }
