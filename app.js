@@ -1079,12 +1079,7 @@ const ViewManager = {
 
     promptAddMemberToTrip(tripId) {
         const friends = Store.data.friends;
-        if (friends.length === 0) {
-            if (confirm('คุณยังไม่มีรายชื่อเพื่อน โปรดเพิ่มเพื่อน\n\nต้องการไปที่หน้าเพิ่มเพื่อนเลยไหม?')) {
-                this.renderAddEditFriend();
-            }
-            return;
-        }
+
 
         // Render Modal
         const modalContainer = document.getElementById('modal-container');
