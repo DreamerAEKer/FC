@@ -237,23 +237,32 @@ const ViewManager = {
         // Re-render standard Home View structure
         mainContent.innerHTML = `
             <div id="home-view" class="view active">
-                <div class="welcome-card">
-                    <h2>ยินดีต้อนรับ!</h2>
-                    <p>เริ่มจัดการค่าใช้จ่ายได้เลย</p>
-                    <div style="display:flex; gap:8px; margin-bottom: 12px;">
-                        <button id="btn-create-trip-hero" class="btn btn-primary" style="flex:1; justify-content:center;">
-                            <span class="material-icons-round">add</span> ค่าใช้จ่ายใหม่
+                <div class="welcome-card" style="display:flex; flex-direction:column; align-items:center; text-align:center; padding: 24px;">
+                    <h2 style="margin-bottom: 4px;">ยินดีต้อนรับ!</h2>
+                    <p style="opacity:0.9; margin-bottom: 24px;">เริ่มจัดการค่าใช้จ่ายได้เลย</p>
+                    
+                    <div style="display:flex; gap:16px; width:100%; justify-content:center; align-items: stretch;">
+                        
+                        <!-- Primary: Create New Trip -->
+                        <button id="btn-create-trip-hero" class="btn" style="flex: 1; background: white; color: var(--primary-color); border-radius: 20px; padding: 20px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border:none; height: 120px;">
+                            <div style="background: var(--primary-light); padding: 12px; border-radius: 50%;">
+                                <span class="material-icons-round" style="font-size: 32px; color: white;">add</span>
+                            </div>
+                            <span style="font-weight: 600; font-size: 1rem;">เปิดทริปใหม่</span>
                         </button>
-                         <button id="btn-import-card" class="btn" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.4);">
-                            <span class="material-icons-round">qr_code_scanner</span> นำเข้าด้วย QR
+
+                        <!-- Secondary: Import -->
+                        <button id="btn-import-card" class="btn" style="flex: 1; background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.4); border-radius: 20px; padding: 20px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; height: 120px;">
+                            <span class="material-icons-round" style="font-size: 32px; opacity: 0.9;">qr_code_scanner</span>
+                            <span style="font-weight: 500; font-size: 1rem;">สแกนเข้าทริป</span>
                         </button>
                     </div>
                     
                     <!-- Hidden File Input -->
                     <input type="file" id="inp-scan-file" accept="image/*" style="display:none;">
                     
-                    <div style="text-align: center; margin-top: 8px;">
-                         <a href="#" id="link-manual-join" style="color: rgba(255,255,255,0.8); font-size: 0.8rem; text-decoration: none; border-bottom: 1px dotted rgba(255,255,255,0.5);">กรอกรหัสด้วยตัวเอง</a>
+                    <div style="text-align: center; margin-top: 16px;">
+                         <a href="#" id="link-manual-join" style="color: rgba(255,255,255,0.8); font-size: 0.8rem; text-decoration: none; border-bottom: 1px dotted rgba(255,255,255,0.5);">หรือ กรอกรหัสด้วยตัวเอง</a>
                     </div>
                 </div>
 
@@ -1414,7 +1423,12 @@ const ViewManager = {
         modalContainer.innerHTML = `
             <div class="modal-overlay" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1050; display: flex; align-items: center; justify-content: center; padding: 20px;">
                 <div class="modal-card" style="background: white; width: 100%; max-width: 350px; border-radius: 20px; padding: 24px;">
-                    <h3 style="margin-bottom: 20px;">${isEdit ? 'แก้ไขทริป' : 'สร้างทริปใหม่'}</h3>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3 style="margin: 0;">${isEdit ? 'แก้ไขทริป' : 'สร้างทริปใหม่'}</h3>
+                        <button id="btn-close-modal-x" class="btn" style="padding: 4px; width: 32px; height: 32px; justify-content: center; background: #f5f5f5; border-radius: 50%;">
+                            <span class="material-icons-round" style="font-size: 20px; color: #666;">close</span>
+                        </button>
+                    </div>
                     
                     <!-- Cover Photo Upload & Adjust -->
                     <div style="margin-bottom: 20px;">
@@ -1661,6 +1675,18 @@ const ViewManager = {
             window.removeEventListener('touchend', stopDrag);
             modalContainer.innerHTML = '';
         });
+
+        // X Button Listener (Same logic as cancel)
+        const btnCloseX = document.getElementById('btn-close-modal-x');
+        if (btnCloseX) {
+            btnCloseX.addEventListener('click', () => {
+                window.removeEventListener('mousemove', moveDrag);
+                window.removeEventListener('touchmove', moveDrag);
+                window.removeEventListener('mouseup', stopDrag);
+                window.removeEventListener('touchend', stopDrag);
+                document.getElementById('modal-container').innerHTML = '';
+            });
+        }
 
         document.getElementById('btn-save-trip-modal').addEventListener('click', () => {
             const name = document.getElementById('inp-trip-name').value.trim();
