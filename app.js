@@ -73,6 +73,16 @@ const Store = {
         return newTrip;
     },
 
+    deleteExpense(tripId, expenseId) {
+        const trip = this.data.trips.find(t => t.id === tripId);
+        if (!trip) return;
+        const idx = trip.expenses.findIndex(e => e.id === expenseId);
+        if (idx !== -1) {
+            trip.expenses.splice(idx, 1);
+            this.save();
+        }
+    },
+
     confirmDeleteExpense(tripId, expenseId) {
         if (confirm('ยืนยันลบรายการนี้?')) {
             this.deleteExpense(tripId, expenseId);
@@ -506,6 +516,10 @@ const ViewManager = {
                                  ontouchstart="handleSwipeStart(event)" 
                                  ontouchmove="handleSwipeMove(event)" 
                                  ontouchend="handleSwipeEnd(event)"
+                                 onmousedown="handleSwipeStart(event)" 
+                                 onmousemove="handleSwipeMove(event)" 
+                                 onmouseup="handleSwipeEnd(event)"
+                                 onmouseleave="handleSwipeEnd(event)"
                                  onclick="if(!this.classList.contains('swiped')) ViewManager.renderAddExpense('${tripId}', '${e.id}')">
                                 
                                 <div style="display:flex; justify-content:space-between; align-items:center; padding: 16px;">
