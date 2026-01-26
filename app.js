@@ -41,7 +41,15 @@ const Store = {
     },
 
     save() {
-        localStorage.setItem('saduak_data', JSON.stringify(this.data));
+        try {
+            localStorage.setItem('saduak_data', JSON.stringify(this.data));
+        } catch (e) {
+            if (e.name === 'QuotaExceededError' || e.code === 22) {
+                alert('เมมเต็มครับ! (Storage Full)\nกรุณาลบทริปเก่าๆ ออกบ้างนะครับ');
+            } else {
+                console.error('Save failed:', e);
+            }
+        }
     },
 
     seedData() {
@@ -139,48 +147,84 @@ const Store = {
                 delete incomingTrip._embeddedMembers; // Clean up
             }
 
+            delete incomingTrip._embeddedMembers; // Clean up
+        }
+
             // Find existing trip or create new
             let existingTrip = this.data.trips.find(t => t.id === incomingTrip.id);
 
-            if (!existingTrip) {
-                // New Trip
-                this.data.trips.unshift(incomingTrip);
-            } else {
-                // Merge Logic
-                // 1. Merge Members (Union)
-                const existingMembers = new Set(existingTrip.members || []);
-                (incomingTrip.members || []).forEach(mId => existingMembers.add(mId));
-                existingTrip.members = Array.from(existingMembers);
+        if (!existingTrip) {
+            // New Trip
+            this.data.trips.unshift(incomingTrip);
+        } else {
+            // Merge Logic
+            // 1. Merge Members (Union)
+            const existingMembers = new Set(existingTrip.members || []);
+            (incomingTrip.members || []).forEach(mId => existingMembers.add(mId));
+            existingTrip.members = Array.from(existingMembers);
 
-                // 2. Merge Expenses (Upsert by ID)
-                if (!existingTrip.expenses) existingTrip.expenses = [];
-                const expenseMap = new Map();
-                existingTrip.expenses.forEach(e => expenseMap.set(e.id, e));
+            // 2. Merge Expenses (Upsert by ID)
+            if (!existingTrip.expenses) existingTrip.expenses = [];
+            const expenseMap = new Map();
+            existingTrip.expenses.forEach(e => expenseMap.set(e.id, e));
 
-                (incomingTrip.expenses || []).forEach(e => {
-                    // Overwrite if incoming is newer? Or just trust incoming as 'update'?
-                    // For simplicity: Incoming overwrites existing (Last Write Wins roughly).
-                    expenseMap.set(e.id, e);
-                });
+            (incomingTrip.expenses || []).forEach(e => {
+                // Overwrite if incoming is newer? Or just trust incoming as 'update'?
+                // For simplicity: Incoming overwrites existing (Last Write Wins roughly).
+                expenseMap.set(e.id, e);
+            });
 
-                existingTrip.expenses = Array.from(expenseMap.values());
+            existingTrip.expenses = Array.from(expenseMap.values());
 
-                // Sort by timestamp desc
-                existingTrip.expenses.sort((a, b) => b.timestamp - a.timestamp);
-            }
-
-            // Sync global friends if needed? 
-            // Ideally we should sync friend details too, but friends are global ID linked.
-            // For this prototype, we assume friend IDs match if created on one device and shared.
-            // (To fix properly: Trip needs to carry concise Friend Profiles too).
-
-            this.save();
-            return incomingTrip.id;
-        } catch (e) {
-            console.error('Import failed', e);
-            alert('รหัสไม่ถูกต้อง หรือข้อมูลเสียหาย');
-            return null;
+            // Sort by timestamp desc
+            existingTrip.expenses.sort((a, b) => b.timestamp - a.timestamp);
         }
+
+        // Sync global friends if needed? 
+        // Ideally we should sync friend details too, but friends are global ID linked.
+        // For this prototype, we assume friend IDs match if created on one device and shared.
+        // (To fix properly: Trip needs to carry concise Friend Profiles too).
+
+        this.save();
+        return incomingTrip.id;
+    } catch(e) {
+        console.error('Import failed', e);
+        alert('รหัสไม่ถูกต้อง หรือข้อมูลเสียหาย');
+        return null;
+    }
+},
+
+    /**
+     * Image Compression Helper
+     * Returns a Promise resolving to base64 string
+     */
+    compressImage(file, maxWidth = 800, quality = 0.7) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target.result;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > maxWidth) {
+                        height *= maxWidth / width;
+                        width = maxWidth;
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    resolve(canvas.toDataURL('image/jpeg', quality));
+                };
+                img.onerror = (err) => reject(err);
+            };
+            reader.onerror = (err) => reject(err);
+        });
     }
 };
 
@@ -1561,245 +1605,265 @@ const ViewManager = {
         }
 
         // File Input
-        photoInput.addEventListener('change', (e) => {
+        // File Input
+        photoInput.addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (!file) return;
 
-            const reader = new FileReader();
-            reader.onload = (evt) => {
+            try {
+                // Compress (800px, 0.7)
+                const compressedBase64 = await Store.compressImage(file, 800, 0.7);
+
                 const img = new Image();
                 img.onload = () => {
                     originalImage = img;
-                    previewImg.src = img.src;
+                    fitImageToContainer();
+                    previewImg.src = compressedBase64;
                     previewImg.style.display = 'block';
                     document.getElementById('placeholder-text').style.display = 'none';
-                    document.getElementById('btn-remove-trip-photo').style.display = 'flex'; // Show remove btn
-                    photoInput.style.pointerEvents = 'none'; // Switch to drag mode
+                    document.getElementById('btn-remove-trip-photo').style.display = 'flex';
                     zoomSlider.style.display = 'block';
-
-                    fitImageToContainer();
+                    photoInput.style.pointerEvents = 'none';
                 };
-                img.src = evt.target.result;
-            };
-            reader.readAsDataURL(file);
-        });
-
-        // Remove Photo Logic
-        const btnRemove = document.getElementById('btn-remove-trip-photo');
-
-        // Prevent Drag Logic interactions
-        ['mousedown', 'touchstart'].forEach(evt =>
-            btnRemove.addEventListener(evt, e => e.stopPropagation())
-        );
-
-        btnRemove.addEventListener('click', (e) => {
-            e.stopPropagation(); // Prevent triggering other clicks? Not needed usually but good practice
-            e.preventDefault();
-
-            originalImage = null;
-            previewImg.src = '';
-            previewImg.style.display = 'none';
-            document.getElementById('placeholder-text').style.display = 'block';
-            btnRemove.style.display = 'none';
-            zoomSlider.style.display = 'none';
-
-            photoInput.value = ''; // Reset input
-            photoInput.style.pointerEvents = 'auto'; // Re-enable click
-
-            // Important: Update trip state so if saved, it's cleared
-            trip.photo = null;
-        });
-
-        // Zoom
-        zoomSlider.addEventListener('input', (e) => {
-            currentScale = parseFloat(e.target.value);
-            updateTransform();
-        });
-
-        // Drag Logic (Mouse + Touch)
-        const startDrag = (e) => {
-            if (!originalImage) return; // Only if image loaded
-            // If clicking the file input, let it handle file. 
-            // But we disabled pointerEvents on file input when image loaded.
-
-            isDragging = true;
-            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-
-            startX = clientX;
-            startY = clientY;
-            initialX = posX;
-            initialY = posY;
-            cropContainer.style.cursor = 'grabbing';
-            e.preventDefault(); // Prevent scroll on mobile
-        };
-
-        const moveDrag = (e) => {
-            if (!isDragging) return;
-            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-
-            const dx = clientX - startX;
-            const dy = clientY - startY;
-
-            posX = initialX + dx;
-            posY = initialY + dy;
-            updateTransform();
-        };
-
-        const stopDrag = () => {
-            isDragging = false;
-            cropContainer.style.cursor = 'move';
-        };
-
-        cropContainer.addEventListener('mousedown', startDrag);
-        cropContainer.addEventListener('touchstart', startDrag);
-
-        window.addEventListener('mousemove', moveDrag);
-        window.addEventListener('touchmove', moveDrag, { passive: false });
-
-        window.addEventListener('mouseup', stopDrag);
-        window.addEventListener('touchend', stopDrag);
-
-        // --- End UI Logic ---
-
-        document.getElementById('inp-trip-name').focus();
-
-        // Voice Logic
-        document.getElementById('btn-voice-trip').addEventListener('click', () => {
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!SpeechRecognition) return alert('ใช้ Voice ไม่ได้ในเบราว์เซอร์นี้');
-
-            const recognition = new SpeechRecognition();
-            recognition.lang = 'th-TH';
-            const btn = document.getElementById('btn-voice-trip');
-            btn.style.background = '#ff5252';
-            btn.style.color = 'white';
-            recognition.start();
-            recognition.onresult = (e) => { document.getElementById('inp-trip-name').value = e.results[0][0].transcript; };
-            recognition.onspeechend = () => { recognition.stop(); btn.style.background = '#eee'; btn.style.color = 'black'; };
-            recognition.onerror = () => {
-                btn.style.background = '#eee';
-                btn.style.color = 'black';
-            };
-        });
-
-        document.getElementById('btn-cancel-trip-modal').addEventListener('click', () => {
-            // Cleanup global listeners to avoid leaks if reopening
-            window.removeEventListener('mousemove', moveDrag);
-            window.removeEventListener('touchmove', moveDrag);
-            window.removeEventListener('mouseup', stopDrag);
-            window.removeEventListener('touchend', stopDrag);
-            modalContainer.innerHTML = '';
-        });
-
-        // X Button Listener (Same logic as cancel)
-        const btnCloseX = document.getElementById('btn-close-modal-x');
-        if (btnCloseX) {
-            btnCloseX.addEventListener('click', () => {
-                window.removeEventListener('mousemove', moveDrag);
-                window.removeEventListener('touchmove', moveDrag);
-                window.removeEventListener('mouseup', stopDrag);
-                window.removeEventListener('touchend', stopDrag);
-                document.getElementById('modal-container').innerHTML = '';
-            });
-        }
-
-        document.getElementById('btn-save-trip-modal').addEventListener('click', () => {
-            const name = document.getElementById('inp-trip-name').value.trim();
-            if (!name) return alert('กรุณาใส่ชื่อทริป');
-
-            let finalPhoto = trip.photo;
-
-            // Crop Logic
-            if (originalImage) {
-                const canvas = document.createElement('canvas');
-                // Target Output Size (e.g. 2:1 ratio for nice banner)
-                canvas.width = 800;
-                canvas.height = 400;
-                const ctx = canvas.getContext('2d');
-
-                // Get rendered size relative to container
-                const imgRenderedWidth = previewImg.offsetWidth * currentScale;
-                const imgRenderedHeight = previewImg.offsetHeight * currentScale;
-                const containerWidth = cropContainer.clientWidth;
-                const containerHeight = cropContainer.clientHeight;
-
-                // Calculate scale factor between Container and Canvas
-                const scaleX = canvas.width / containerWidth;
-                const scaleY = canvas.height / containerHeight;
-                // We use one scale to maintain aspect ratio, but here we want to map explicitly
-                // We draw the image at the position relative to the canvas 0,0 matched to container 0,0
-                // PosX, PosY is relative to container top-left
-
-                const drawX = posX * scaleX; // Scaled position
-                const drawY = posY * scaleY;
-                const drawW = imgRenderedWidth * scaleX;
-                const drawH = imgRenderedHeight * scaleX; // Assume square pixels
-
-                // Fill background (if image dragged too far)
-                ctx.fillStyle = '#ffffff';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-                ctx.drawImage(originalImage, drawX, drawY, drawW, drawH);
-
-                finalPhoto = canvas.toDataURL('image/jpeg', 0.85);
+                img.src = compressedBase64;
+            } catch (err) {
+                console.error(err);
+                alert('โหลดรูปไม่สำเร็จ');
             }
-
-            if (isEdit) {
-                trip.name = name;
-                trip.photo = finalPhoto;
-                Store.save();
-                this.renderTripDetail(tripId);
-            } else {
-                Store.addTrip(name, finalPhoto);
-                this.renderTripList();
-            }
-
-            // Cleanup
-            window.removeEventListener('mousemove', moveDrag);
-            window.removeEventListener('touchmove', moveDrag);
-            window.removeEventListener('mouseup', stopDrag);
-            window.removeEventListener('touchend', stopDrag);
-            modalContainer.innerHTML = '';
         });
+        const img = new Image();
+        img.onload = () => {
+            originalImage = img;
+            previewImg.src = img.src;
+            previewImg.style.display = 'block';
+            document.getElementById('placeholder-text').style.display = 'none';
+            document.getElementById('btn-remove-trip-photo').style.display = 'flex'; // Show remove btn
+            photoInput.style.pointerEvents = 'none'; // Switch to drag mode
+            zoomSlider.style.display = 'block';
+
+            fitImageToContainer();
+        };
+        img.src = evt.target.result;
+    };
+    reader.readAsDataURL(file);
+});
+
+// Remove Photo Logic
+const btnRemove = document.getElementById('btn-remove-trip-photo');
+
+// Prevent Drag Logic interactions
+['mousedown', 'touchstart'].forEach(evt =>
+    btnRemove.addEventListener(evt, e => e.stopPropagation())
+);
+
+btnRemove.addEventListener('click', (e) => {
+    e.stopPropagation(); // Prevent triggering other clicks? Not needed usually but good practice
+    e.preventDefault();
+
+    originalImage = null;
+    previewImg.src = '';
+    previewImg.style.display = 'none';
+    document.getElementById('placeholder-text').style.display = 'block';
+    btnRemove.style.display = 'none';
+    zoomSlider.style.display = 'none';
+
+    photoInput.value = ''; // Reset input
+    photoInput.style.pointerEvents = 'auto'; // Re-enable click
+
+    // Important: Update trip state so if saved, it's cleared
+    trip.photo = null;
+});
+
+// Zoom
+zoomSlider.addEventListener('input', (e) => {
+    currentScale = parseFloat(e.target.value);
+    updateTransform();
+});
+
+// Drag Logic (Mouse + Touch)
+const startDrag = (e) => {
+    if (!originalImage) return; // Only if image loaded
+    // If clicking the file input, let it handle file. 
+    // But we disabled pointerEvents on file input when image loaded.
+
+    isDragging = true;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+    startX = clientX;
+    startY = clientY;
+    initialX = posX;
+    initialY = posY;
+    cropContainer.style.cursor = 'grabbing';
+    e.preventDefault(); // Prevent scroll on mobile
+};
+
+const moveDrag = (e) => {
+    if (!isDragging) return;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+    const dx = clientX - startX;
+    const dy = clientY - startY;
+
+    posX = initialX + dx;
+    posY = initialY + dy;
+    updateTransform();
+};
+
+const stopDrag = () => {
+    isDragging = false;
+    cropContainer.style.cursor = 'move';
+};
+
+cropContainer.addEventListener('mousedown', startDrag);
+cropContainer.addEventListener('touchstart', startDrag);
+
+window.addEventListener('mousemove', moveDrag);
+window.addEventListener('touchmove', moveDrag, { passive: false });
+
+window.addEventListener('mouseup', stopDrag);
+window.addEventListener('touchend', stopDrag);
+
+// --- End UI Logic ---
+
+document.getElementById('inp-trip-name').focus();
+
+// Voice Logic
+document.getElementById('btn-voice-trip').addEventListener('click', () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return alert('ใช้ Voice ไม่ได้ในเบราว์เซอร์นี้');
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'th-TH';
+    const btn = document.getElementById('btn-voice-trip');
+    btn.style.background = '#ff5252';
+    btn.style.color = 'white';
+    recognition.start();
+    recognition.onresult = (e) => { document.getElementById('inp-trip-name').value = e.results[0][0].transcript; };
+    recognition.onspeechend = () => { recognition.stop(); btn.style.background = '#eee'; btn.style.color = 'black'; };
+    recognition.onerror = () => {
+        btn.style.background = '#eee';
+        btn.style.color = 'black';
+    };
+});
+
+document.getElementById('btn-cancel-trip-modal').addEventListener('click', () => {
+    // Cleanup global listeners to avoid leaks if reopening
+    window.removeEventListener('mousemove', moveDrag);
+    window.removeEventListener('touchmove', moveDrag);
+    window.removeEventListener('mouseup', stopDrag);
+    window.removeEventListener('touchend', stopDrag);
+    modalContainer.innerHTML = '';
+});
+
+// X Button Listener (Same logic as cancel)
+const btnCloseX = document.getElementById('btn-close-modal-x');
+if (btnCloseX) {
+    btnCloseX.addEventListener('click', () => {
+        window.removeEventListener('mousemove', moveDrag);
+        window.removeEventListener('touchmove', moveDrag);
+        window.removeEventListener('mouseup', stopDrag);
+        window.removeEventListener('touchend', stopDrag);
+        document.getElementById('modal-container').innerHTML = '';
+    });
+}
+
+document.getElementById('btn-save-trip-modal').addEventListener('click', () => {
+    const name = document.getElementById('inp-trip-name').value.trim();
+    if (!name) return alert('กรุณาใส่ชื่อทริป');
+
+    let finalPhoto = trip.photo;
+
+    // Crop Logic
+    if (originalImage) {
+        const canvas = document.createElement('canvas');
+        // Target Output Size (e.g. 2:1 ratio for nice banner)
+        canvas.width = 800;
+        canvas.height = 400;
+        const ctx = canvas.getContext('2d');
+
+        // Get rendered size relative to container
+        const imgRenderedWidth = previewImg.offsetWidth * currentScale;
+        const imgRenderedHeight = previewImg.offsetHeight * currentScale;
+        const containerWidth = cropContainer.clientWidth;
+        const containerHeight = cropContainer.clientHeight;
+
+        // Calculate scale factor between Container and Canvas
+        const scaleX = canvas.width / containerWidth;
+        const scaleY = canvas.height / containerHeight;
+        // We use one scale to maintain aspect ratio, but here we want to map explicitly
+        // We draw the image at the position relative to the canvas 0,0 matched to container 0,0
+        // PosX, PosY is relative to container top-left
+
+        const drawX = posX * scaleX; // Scaled position
+        const drawY = posY * scaleY;
+        const drawW = imgRenderedWidth * scaleX;
+        const drawH = imgRenderedHeight * scaleX; // Assume square pixels
+
+        // Fill background (if image dragged too far)
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.drawImage(originalImage, drawX, drawY, drawW, drawH);
+
+        finalPhoto = canvas.toDataURL('image/jpeg', 0.85);
+    }
+
+    if (isEdit) {
+        trip.name = name;
+        trip.photo = finalPhoto;
+        Store.save();
+        this.renderTripDetail(tripId);
+    } else {
+        Store.addTrip(name, finalPhoto);
+        this.renderTripList();
+    }
+
+    // Cleanup
+    window.removeEventListener('mousemove', moveDrag);
+    window.removeEventListener('touchmove', moveDrag);
+    window.removeEventListener('mouseup', stopDrag);
+    window.removeEventListener('touchend', stopDrag);
+    modalContainer.innerHTML = '';
+});
     },
 
-    calculateDebtTransfers(balances, members) {
-        // Convert balances to array
-        let debtors = [];
-        let creditors = [];
+calculateDebtTransfers(balances, members) {
+    // Convert balances to array
+    let debtors = [];
+    let creditors = [];
 
-        for (const [id, amount] of Object.entries(balances)) {
-            // Precision adjustment
-            if (Math.abs(amount) < 0.01) continue;
-            if (amount > 0) creditors.push({ id, amount });
-            if (amount < 0) debtors.push({ id, amount });
-        }
+    for (const [id, amount] of Object.entries(balances)) {
+        // Precision adjustment
+        if (Math.abs(amount) < 0.01) continue;
+        if (amount > 0) creditors.push({ id, amount });
+        if (amount < 0) debtors.push({ id, amount });
+    }
 
-        debtors.sort((a, b) => a.amount - b.amount); // Most negative first
-        creditors.sort((a, b) => b.amount - a.amount); // Most positive first
+    debtors.sort((a, b) => a.amount - b.amount); // Most negative first
+    creditors.sort((a, b) => b.amount - a.amount); // Most positive first
 
-        let html = '';
-        let i = 0; // debtor index
-        let j = 0; // creditor index
+    let html = '';
+    let i = 0; // debtor index
+    let j = 0; // creditor index
 
-        if (debtors.length === 0 && creditors.length === 0) {
-            return `<div style="text-align:center; color:#888;">เคลียร์หมดแล้วจ้า!</div>`;
-        }
+    if (debtors.length === 0 && creditors.length === 0) {
+        return `<div style="text-align:center; color:#888;">เคลียร์หมดแล้วจ้า!</div>`;
+    }
 
-        while (i < debtors.length && j < creditors.length) {
-            let debtor = debtors[i];
-            let creditor = creditors[j];
+    while (i < debtors.length && j < creditors.length) {
+        let debtor = debtors[i];
+        let creditor = creditors[j];
 
-            // The amount to settle is the minimum of what debtor owes and what creditor is owed
-            let amount = Math.min(Math.abs(debtor.amount), creditor.amount);
+        // The amount to settle is the minimum of what debtor owes and what creditor is owed
+        let amount = Math.min(Math.abs(debtor.amount), creditor.amount);
 
-            // Get names
-            let dName = members.find(m => m.id === debtor.id)?.name || 'Unknown';
-            let cName = members.find(m => m.id === creditor.id)?.name || 'Unknown';
+        // Get names
+        let dName = members.find(m => m.id === debtor.id)?.name || 'Unknown';
+        let cName = members.find(m => m.id === creditor.id)?.name || 'Unknown';
 
-            html += `
+        html += `
                 <div style="background: white; padding: 16px; border-radius: 12px; margin-bottom: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: space-between;">
                     <div style="display:flex; align-items:center; gap:8px;">
                          <span style="font-weight:500; color: #F44336;">${dName}</span>
@@ -1810,27 +1874,27 @@ const ViewManager = {
                 </div>
             `;
 
-            // Update remaining amounts
-            debtor.amount += amount;
-            creditor.amount -= amount;
+        // Update remaining amounts
+        debtor.amount += amount;
+        creditor.amount -= amount;
 
-            // Move indices if settled
-            if (Math.abs(debtor.amount) < 0.01) i++;
-            if (creditor.amount < 0.01) j++;
-        }
+        // Move indices if settled
+        if (Math.abs(debtor.amount) < 0.01) i++;
+        if (creditor.amount < 0.01) j++;
+    }
 
-        return html;
-    },
+    return html;
+},
 
-    renderTripMembers(memberIds) {
-        if (!memberIds || memberIds.length === 0) {
-            return `<div style="color: #999; font-size: 0.9rem; font-style: italic;">ยังไม่มีสมาชิก</div>`;
-        }
+renderTripMembers(memberIds) {
+    if (!memberIds || memberIds.length === 0) {
+        return `<div style="color: #999; font-size: 0.9rem; font-style: italic;">ยังไม่มีสมาชิก</div>`;
+    }
 
-        // Resolve member details
-        const members = memberIds.map(id => Store.data.friends.find(f => f.id === id)).filter(Boolean);
+    // Resolve member details
+    const members = memberIds.map(id => Store.data.friends.find(f => f.id === id)).filter(Boolean);
 
-        return members.map(m => `
+    return members.map(m => `
             <div class="member-chip" style="min-width: 60px; display: flex; flex-direction: column; align-items: center; gap: 4px;">
                 <div class="avatar" style="width: 48px; height: 48px; background: #eee; border-radius: 50%; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                     ${m.photo ? `<img src="${m.photo}" style="width:100%; height:100%; object-fit:cover;">` : `<span class="material-icons-round" style="color:#aaa;">person</span>`}
@@ -1838,22 +1902,22 @@ const ViewManager = {
                 <span style="font-size: 0.75rem; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;">${m.name}</span>
             </div>
         `).join('');
-    },
+},
 
-    renderExpenseList(expenses) {
-        if (!expenses || expenses.length === 0) {
-            return `
+renderExpenseList(expenses) {
+    if (!expenses || expenses.length === 0) {
+        return `
                 <div class="empty-state" style="text-align: center; color: #ccc; padding: 20px;">
                     <p>ยังไม่มีรายการค่าใช้จ่าย</p>
                 </div>
             `;
-        }
+    }
 
-        return expenses.map(e => {
-            const payer = Store.data.friends.find(f => f.id === e.payerId);
-            const payerName = payer ? payer.name : 'Unknown';
-            // Note: onclick uses window.ViewManager
-            return `
+    return expenses.map(e => {
+        const payer = Store.data.friends.find(f => f.id === e.payerId);
+        const payerName = payer ? payer.name : 'Unknown';
+        // Note: onclick uses window.ViewManager
+        return `
                 <div onclick="window.ViewManager.renderCardPreview(window.Store.data.trips.find(t => t.id === '${e.tripId}'), window.Store.data.trips.find(t => t.id === '${e.tripId}').expenses.find(x => x.id === '${e.id}'))" 
                      style="background: white; padding: 12px; border-radius: 12px; margin-bottom: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
                     <div>
@@ -1865,27 +1929,27 @@ const ViewManager = {
                     </div>
                 </div>
         `;
-        }).join('');
-    },
+    }).join('');
+},
 
-    promptAddMemberToTrip(tripId) {
-        try {
-            const friends = Store.data.friends || [];
+promptAddMemberToTrip(tripId) {
+    try {
+        const friends = Store.data.friends || [];
 
-            // Debug: Check if method exists
-            if (typeof this.renderQuickAddFriendModal !== 'function') {
-                throw new Error('renderQuickAddFriendModal is missing!');
-            }
+        // Debug: Check if method exists
+        if (typeof this.renderQuickAddFriendModal !== 'function') {
+            throw new Error('renderQuickAddFriendModal is missing!');
+        }
 
-            // Render Modal
-            const modalContainer = document.getElementById('modal-container');
-            const trip = Store.data.trips.find(t => t.id === tripId);
-            if (!trip) throw new Error('Trip not found: ' + tripId);
+        // Render Modal
+        const modalContainer = document.getElementById('modal-container');
+        const trip = Store.data.trips.find(t => t.id === tripId);
+        if (!trip) throw new Error('Trip not found: ' + tripId);
 
-            const existingMembers = trip.members || [];
+        const existingMembers = trip.members || [];
 
-            const renderSelectionModal = () => {
-                modalContainer.innerHTML = `
+        const renderSelectionModal = () => {
+            modalContainer.innerHTML = `
                     <div class="modal-overlay" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px;">
                         <div class="modal-card" style="background: white; width: 100%; max-width: 400px; border-radius: 20px; padding: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
@@ -1897,9 +1961,9 @@ const ViewManager = {
                             
                             <div id="friend-select-list" style="max-height: 300px; overflow-y: auto; margin-bottom: 24px;">
                                 ${friends.length === 0 ? `<div style="text-align:center; color:#999; padding:20px;">ยังไม่มีเพื่อนในรายการ</div>` :
-                        friends.map(f => {
-                            const isAdded = existingMembers.includes(f.id);
-                            return `
+                    friends.map(f => {
+                        const isAdded = existingMembers.includes(f.id);
+                        return `
                                         <div class="friend-select-item" data-id="${f.id}" style="display: flex; align-items: center; padding: 8px; border-radius: 12px; margin-bottom: 8px; cursor: pointer; background: ${isAdded ? '#f5f5f5' : 'white'}; border: 2px solid ${isAdded ? 'transparent' : '#eee'}; opacity: ${isAdded ? 0.6 : 1}; pointer-events: ${isAdded ? 'none' : 'auto'};">
                                             <div style="position: relative; margin-right: 12px;">
                                                 <div class="avatar" style="width: 48px; height: 48px; background: #eee; border-radius: 50%; display: flex; align-items: center; justify-content: center; overflow: hidden;">
@@ -1915,7 +1979,7 @@ const ViewManager = {
                                             </div>
                                         </div>
                                     `;
-                        }).join('')}
+                    }).join('')}
                             </div>
 
                             <div style="display: flex; gap: 12px;">
@@ -1926,70 +1990,70 @@ const ViewManager = {
                     </div>
                 `;
 
-                // Re-bind Selection Logic (Same as before)
-                const selectedIds = new Set();
-                modalContainer.querySelectorAll('.friend-select-item').forEach(item => {
-                    item.addEventListener('click', () => {
-                        const id = item.dataset.id;
-                        const check = item.querySelector('.check-indicator');
-                        if (selectedIds.has(id)) {
-                            selectedIds.delete(id);
-                            item.style.borderColor = '#eee';
-                            item.style.backgroundColor = 'white';
-                            check.style.display = 'none';
-                        } else {
-                            selectedIds.add(id);
-                            item.style.borderColor = 'var(--primary-color)';
-                            item.style.backgroundColor = 'var(--primary-light-alpha, #f3e5f5)';
-                            check.style.display = 'flex';
-                        }
-                    });
-                });
-
-                document.getElementById('btn-cancel-modal').addEventListener('click', () => modalContainer.innerHTML = '');
-                document.getElementById('btn-confirm-modal').addEventListener('click', () => {
-                    if (selectedIds.size > 0) {
-                        if (!trip.members) trip.members = [];
-                        selectedIds.forEach(id => trip.members.push(id));
-                        Store.save();
-                        this.renderTripDetail(tripId);
+            // Re-bind Selection Logic (Same as before)
+            const selectedIds = new Set();
+            modalContainer.querySelectorAll('.friend-select-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const id = item.dataset.id;
+                    const check = item.querySelector('.check-indicator');
+                    if (selectedIds.has(id)) {
+                        selectedIds.delete(id);
+                        item.style.borderColor = '#eee';
+                        item.style.backgroundColor = 'white';
+                        check.style.display = 'none';
+                    } else {
+                        selectedIds.add(id);
+                        item.style.borderColor = 'var(--primary-color)';
+                        item.style.backgroundColor = 'var(--primary-light-alpha, #f3e5f5)';
+                        check.style.display = 'flex';
                     }
-                    modalContainer.innerHTML = '';
                 });
+            });
 
-                // New: Quick Create Button
-                document.getElementById('btn-quick-create-friend').addEventListener('click', () => {
-                    this.renderQuickAddFriendModal((newFriendId) => {
-                        trip.members.push(newFriendId);
-                        Store.save();
-                        this.renderTripDetail(tripId);
-                        modalContainer.innerHTML = '';
-                    });
-                });
-            };
-
-            // Initial Trigger
-            if (friends.length === 0) {
-                this.renderQuickAddFriendModal((newFriendId) => {
+            document.getElementById('btn-cancel-modal').addEventListener('click', () => modalContainer.innerHTML = '');
+            document.getElementById('btn-confirm-modal').addEventListener('click', () => {
+                if (selectedIds.size > 0) {
                     if (!trip.members) trip.members = [];
+                    selectedIds.forEach(id => trip.members.push(id));
+                    Store.save();
+                    this.renderTripDetail(tripId);
+                }
+                modalContainer.innerHTML = '';
+            });
+
+            // New: Quick Create Button
+            document.getElementById('btn-quick-create-friend').addEventListener('click', () => {
+                this.renderQuickAddFriendModal((newFriendId) => {
                     trip.members.push(newFriendId);
                     Store.save();
                     this.renderTripDetail(tripId);
+                    modalContainer.innerHTML = '';
                 });
-            } else {
-                renderSelectionModal();
-            }
+            });
+        };
 
-        } catch (e) {
-            alert('เกิดข้อผิดพลาด (Debug): ' + e.message + '\n' + e.stack);
-            console.error(e);
+        // Initial Trigger
+        if (friends.length === 0) {
+            this.renderQuickAddFriendModal((newFriendId) => {
+                if (!trip.members) trip.members = [];
+                trip.members.push(newFriendId);
+                Store.save();
+                this.renderTripDetail(tripId);
+            });
+        } else {
+            renderSelectionModal();
         }
-    },
 
-    // New Helper: Quick Add Friend Modal (No Page Navigation)
-    renderQuickAddFriendModal(onSuccessCallback) {
-        const modalContainer = document.getElementById('modal-container');
-        modalContainer.innerHTML = `
+    } catch (e) {
+        alert('เกิดข้อผิดพลาด (Debug): ' + e.message + '\n' + e.stack);
+        console.error(e);
+    }
+},
+
+// New Helper: Quick Add Friend Modal (No Page Navigation)
+renderQuickAddFriendModal(onSuccessCallback) {
+    const modalContainer = document.getElementById('modal-container');
+    modalContainer.innerHTML = `
             <div class="modal-overlay" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1050; display: flex; align-items: center; justify-content: center; padding: 20px;">
                 <div class="modal-card" style="background: white; width: 100%; max-width: 350px; border-radius: 20px; padding: 24px;">
                     <h3 style="margin-bottom: 16px;">เพิ่มเพื่อนใหม่</h3>
@@ -2004,27 +2068,27 @@ const ViewManager = {
             </div>
         `;
 
-        document.getElementById('quick-friend-name').focus();
+    document.getElementById('quick-friend-name').focus();
 
-        document.getElementById('btn-quick-cancel').addEventListener('click', () => {
-            modalContainer.innerHTML = ''; // Close just this modal? Note: If called from selection modal, this wipes it. Acceptable for now.
-        });
+    document.getElementById('btn-quick-cancel').addEventListener('click', () => {
+        modalContainer.innerHTML = ''; // Close just this modal? Note: If called from selection modal, this wipes it. Acceptable for now.
+    });
 
-        document.getElementById('btn-quick-save').addEventListener('click', () => {
-            const name = document.getElementById('quick-friend-name').value.trim();
-            const phone = document.getElementById('quick-friend-phone').value.trim();
+    document.getElementById('btn-quick-save').addEventListener('click', () => {
+        const name = document.getElementById('quick-friend-name').value.trim();
+        const phone = document.getElementById('quick-friend-phone').value.trim();
 
-            if (!name) {
-                alert('กรุณาใส่ชื่อ');
-                return;
-            }
+        if (!name) {
+            alert('กรุณาใส่ชื่อ');
+            return;
+        }
 
-            const newFriend = Store.addFriend(name, phone);
+        const newFriend = Store.addFriend(name, phone);
 
-            if (onSuccessCallback) onSuccessCallback(newFriend.id);
-            modalContainer.innerHTML = '';
-        });
-    }
+        if (onSuccessCallback) onSuccessCallback(newFriend.id);
+        modalContainer.innerHTML = '';
+    });
+}
 };
 
 // Assuming Store is defined elsewhere, we'll add the method to it.
@@ -2237,158 +2301,144 @@ Object.assign(ViewManager, {
 
         document.getElementById('btn-upload-photo').addEventListener('click', () => photoInput.click());
 
-        photoInput.addEventListener('change', (e) => {
+        photoInput.addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (!file) return;
 
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                const img = new Image();
-                img.onload = () => {
-                    // Resize Logic (Max 250x250)
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-                    const MAX_SIZE = 250;
-                    let width = img.width;
-                    let height = img.height;
-
-                    if (width > height) {
-                        if (width > MAX_SIZE) {
-                            height *= MAX_SIZE / width;
-                            width = MAX_SIZE;
-                        }
-                    } else {
-                        if (height > MAX_SIZE) {
-                            width *= MAX_SIZE / height;
-                            height = MAX_SIZE;
-                        }
-                    }
-
-                    canvas.width = width;
-                    canvas.height = height;
-                    ctx.drawImage(img, 0, 0, width, height);
-
-                    // Output
-                    currentPhotoBase64 = canvas.toDataURL('image/jpeg', 0.8);
-                    previewAvatar.innerHTML = `<img src="${currentPhotoBase64}" style="width:100%; height:100%; object-fit:cover;">`;
-                };
-                img.src = event.target.result;
-            };
-            reader.readAsDataURL(file);
+            try {
+                // Resize Max 250x250
+                currentPhotoBase64 = await Store.compressImage(file, 250, 0.8);
+                previewAvatar.innerHTML = `<img src="${currentPhotoBase64}" style="width:100%; height:100%; object-fit:cover;">`;
+            } catch (err) {
+                console.error(err);
+                alert("โหลดรูปไม่สำเร็จ");
+            }
         });
 
         // Helper: QR Selection & Resize
         const qrInput = document.getElementById('inp-friend-qr');
         let currentQrBase64 = friend.qrCode;
 
-        qrInput.addEventListener('change', (e) => {
+        qrInput.addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (!file) return;
 
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                const img = new Image();
-                img.onload = () => {
-                    // Resize Logic (Max 600x600 for QR)
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-                    const MAX_SIZE = 600;
-                    let width = img.width;
-                    let height = img.height;
+            try {
+                // Resize Max 800 (High Quality for QR)
+                currentQrBase64 = await Store.compressImage(file, 800, 0.9);
 
-                    if (width > height) {
-                        if (width > MAX_SIZE) {
-                            height *= MAX_SIZE / width;
-                            width = MAX_SIZE;
-                        }
-                    } else {
-                        if (height > MAX_SIZE) {
-                            width *= MAX_SIZE / height;
-                            height = MAX_SIZE;
-                        }
-                    }
-
-                    canvas.width = width;
-                    canvas.height = height;
-                    ctx.drawImage(img, 0, 0, width, height);
-                    currentQrBase64 = canvas.toDataURL('image/jpeg', 0.9); // High quality for QR
-
-                    // Update Preview
-                    const qrArea = document.getElementById('qr-upload-area');
-                    qrArea.innerHTML = `<img id="preview-qr-img" src="${currentQrBase64}" style="max-width: 100%; max-height: 200px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">`;
-                    qrArea.appendChild(qrInput); // Re-attach input
-                };
-                img.src = event.target.result;
-            };
-            reader.readAsDataURL(file);
+                // Update Preview
+                const qrArea = document.getElementById('qr-upload-area');
+                qrArea.innerHTML = `<img id="preview-qr-img" src="${currentQrBase64}" style="max-width: 100%; max-height: 200px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">`;
+                qrArea.appendChild(qrInput); // Re-attach input
+            } catch (err) {
+                console.error(err);
+                alert('โหลดรูปไม่สำเร็จ');
+            }
         });
+        reader.onload = (event) => {
+            const img = new Image();
+            img.onload = () => {
+                // Resize Logic (Max 600x600 for QR)
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const MAX_SIZE = 600;
+                let width = img.width;
+                let height = img.height;
 
-
-        // Logic: Save
-        document.getElementById('form-friend').addEventListener('submit', (e) => {
-            e.preventDefault();
-            const name = document.getElementById('inp-friend-name').value.trim();
-            let phone = document.getElementById('inp-friend-phone').value.trim();
-
-            if (!name) return alert('กรุณาใส่ชื่อ');
-
-            // Phone Validation (Thai Mobile)
-            if (phone) {
-                const cleanPhone = phone.replace(/[^0-9]/g, '');
-                if (cleanPhone.length !== 10 || !cleanPhone.startsWith('0')) {
-                    alert('เบอร์โทรศัพท์ไม่ถูกต้อง! \nกรุณากรอกเบอร์มือถือ 10 หลัก (เช่น 0812345678)');
-                    return;
+                if (width > height) {
+                    if (width > MAX_SIZE) {
+                        height *= MAX_SIZE / width;
+                        width = MAX_SIZE;
+                    }
+                } else {
+                    if (height > MAX_SIZE) {
+                        width *= MAX_SIZE / height;
+                        height = MAX_SIZE;
+                    }
                 }
-                phone = cleanPhone;
-            }
 
-            if (isEdit) {
-                // Update Existing
-                const target = Store.data.friends.find(f => f.id === friendId);
-                if (target) {
-                    target.name = name;
-                    target.phone = phone;
-                    target.photo = currentPhotoBase64;
-                    target.qrCode = currentQrBase64; // Save QR
-                }
-            } else {
-                // Add New
-                Store.data.friends.push({
-                    id: 'f' + Date.now(),
-                    name,
-                    phone,
-                    photo: currentPhotoBase64
-                });
-            }
+                canvas.width = width;
+                canvas.height = height;
+                ctx.drawImage(img, 0, 0, width, height);
+                currentQrBase64 = canvas.toDataURL('image/jpeg', 0.9); // High quality for QR
 
+                // Update Preview
+                const qrArea = document.getElementById('qr-upload-area');
+                qrArea.innerHTML = `<img id="preview-qr-img" src="${currentQrBase64}" style="max-width: 100%; max-height: 200px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">`;
+                qrArea.appendChild(qrInput); // Re-attach input
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+
+
+// Logic: Save
+document.getElementById('form-friend').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = document.getElementById('inp-friend-name').value.trim();
+    let phone = document.getElementById('inp-friend-phone').value.trim();
+
+    if (!name) return alert('กรุณาใส่ชื่อ');
+
+    // Phone Validation (Thai Mobile)
+    if (phone) {
+        const cleanPhone = phone.replace(/[^0-9]/g, '');
+        if (cleanPhone.length !== 10 || !cleanPhone.startsWith('0')) {
+            alert('เบอร์โทรศัพท์ไม่ถูกต้อง! \nกรุณากรอกเบอร์มือถือ 10 หลัก (เช่น 0812345678)');
+            return;
+        }
+        phone = cleanPhone;
+    }
+
+    if (isEdit) {
+        // Update Existing
+        const target = Store.data.friends.find(f => f.id === friendId);
+        if (target) {
+            target.name = name;
+            target.phone = phone;
+            target.photo = currentPhotoBase64;
+            target.qrCode = currentQrBase64; // Save QR
+        }
+    } else {
+        // Add New
+        Store.data.friends.push({
+            id: 'f' + Date.now(),
+            name,
+            phone,
+            photo: currentPhotoBase64
+        });
+    }
+
+    Store.save();
+    this.renderFriends();
+});
+
+// Logic: Back (Left)
+document.getElementById('btn-back-friends').addEventListener('click', () => {
+    this.renderFriends();
+});
+
+// Logic: Close (Right)
+const btnClose = document.getElementById('btn-close-friends-edit');
+if (btnClose) {
+    btnClose.addEventListener('click', () => {
+        this.renderFriends();
+    });
+}
+
+// Logic: Delete
+const btnDelete = document.getElementById('btn-delete-friend');
+if (btnDelete) {
+    btnDelete.addEventListener('click', () => {
+        if (confirm('ยืนยันลบรายชื่อนี้? (ข้อมูลในทริปจะยังอยู่ แต่ชื่ออาจหายไป)')) {
+            Store.data.friends = Store.data.friends.filter(f => f.id !== friendId);
             Store.save();
             this.renderFriends();
-        });
-
-        // Logic: Back (Left)
-        document.getElementById('btn-back-friends').addEventListener('click', () => {
-            this.renderFriends();
-        });
-
-        // Logic: Close (Right)
-        const btnClose = document.getElementById('btn-close-friends-edit');
-        if (btnClose) {
-            btnClose.addEventListener('click', () => {
-                this.renderFriends();
-            });
         }
-
-        // Logic: Delete
-        const btnDelete = document.getElementById('btn-delete-friend');
-        if (btnDelete) {
-            btnDelete.addEventListener('click', () => {
-                if (confirm('ยืนยันลบรายชื่อนี้? (ข้อมูลในทริปจะยังอยู่ แต่ชื่ออาจหายไป)')) {
-                    Store.data.friends = Store.data.friends.filter(f => f.id !== friendId);
-                    Store.save();
-                    this.renderFriends();
-                }
-            });
-        }
+    });
+}
     }
 });
 
