@@ -2384,178 +2384,146 @@ Object.assign(ViewManager, {
                 alert('โหลดรูปไม่สำเร็จ');
             }
         });
-        reader.onload = (event) => {
-            const img = new Image();
-            img.onload = () => {
-                // Resize Logic (Max 600x600 for QR)
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                const MAX_SIZE = 600;
-                let width = img.width;
-                let height = img.height;
 
-                if (width > height) {
-                    if (width > MAX_SIZE) {
-                        height *= MAX_SIZE / width;
-                        width = MAX_SIZE;
-                    }
-                } else {
-                    if (height > MAX_SIZE) {
-                        width *= MAX_SIZE / height;
-                        height = MAX_SIZE;
-                    }
+
+
+        // Logic: Save
+        document.getElementById('form-friend').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const name = document.getElementById('inp-friend-name').value.trim();
+            let phone = document.getElementById('inp-friend-phone').value.trim();
+
+            if (!name) return alert('กรุณาใส่ชื่อ');
+
+            // Phone Validation (Thai Mobile)
+            if (phone) {
+                const cleanPhone = phone.replace(/[^0-9]/g, '');
+                if (cleanPhone.length !== 10 || !cleanPhone.startsWith('0')) {
+                    alert('เบอร์โทรศัพท์ไม่ถูกต้อง! \nกรุณากรอกเบอร์มือถือ 10 หลัก (เช่น 0812345678)');
+                    return;
                 }
+                phone = cleanPhone;
+            }
 
-                canvas.width = width;
-                canvas.height = height;
-                ctx.drawImage(img, 0, 0, width, height);
-                currentQrBase64 = canvas.toDataURL('image/jpeg', 0.9); // High quality for QR
+            if (isEdit) {
+                // Update Existing
+                const target = Store.data.friends.find(f => f.id === friendId);
+                if (target) {
+                    target.name = name;
+                    target.phone = phone;
+                    target.photo = currentPhotoBase64;
+                    target.qrCode = currentQrBase64; // Save QR
+                }
+            } else {
+                // Add New
+                Store.data.friends.push({
+                    id: 'f' + Date.now(),
+                    name,
+                    phone,
+                    photo: currentPhotoBase64
+                });
+            }
 
-                // Update Preview
-                const qrArea = document.getElementById('qr-upload-area');
-                qrArea.innerHTML = `<img id="preview-qr-img" src="${currentQrBase64}" style="max-width: 100%; max-height: 200px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">`;
-                qrArea.appendChild(qrInput); // Re-attach input
-            };
-            img.src = event.target.result;
-        };
-        reader.readAsDataURL(file);
-    });
-
-
-// Logic: Save
-document.getElementById('form-friend').addEventListener('submit', (e) => {
-    e.preventDefault();
-    const name = document.getElementById('inp-friend-name').value.trim();
-    let phone = document.getElementById('inp-friend-phone').value.trim();
-
-    if (!name) return alert('กรุณาใส่ชื่อ');
-
-    // Phone Validation (Thai Mobile)
-    if (phone) {
-        const cleanPhone = phone.replace(/[^0-9]/g, '');
-        if (cleanPhone.length !== 10 || !cleanPhone.startsWith('0')) {
-            alert('เบอร์โทรศัพท์ไม่ถูกต้อง! \nกรุณากรอกเบอร์มือถือ 10 หลัก (เช่น 0812345678)');
-            return;
-        }
-        phone = cleanPhone;
-    }
-
-    if (isEdit) {
-        // Update Existing
-        const target = Store.data.friends.find(f => f.id === friendId);
-        if (target) {
-            target.name = name;
-            target.phone = phone;
-            target.photo = currentPhotoBase64;
-            target.qrCode = currentQrBase64; // Save QR
-        }
-    } else {
-        // Add New
-        Store.data.friends.push({
-            id: 'f' + Date.now(),
-            name,
-            phone,
-            photo: currentPhotoBase64
-        });
-    }
-
-    Store.save();
-    this.renderFriends();
-});
-
-// Logic: Back (Left)
-document.getElementById('btn-back-friends').addEventListener('click', () => {
-    this.renderFriends();
-});
-
-// Logic: Close (Right)
-const btnClose = document.getElementById('btn-close-friends-edit');
-if (btnClose) {
-    btnClose.addEventListener('click', () => {
-        this.renderFriends();
-    });
-}
-
-// Logic: Delete
-const btnDelete = document.getElementById('btn-delete-friend');
-if (btnDelete) {
-    btnDelete.addEventListener('click', () => {
-        if (confirm('ยืนยันลบรายชื่อนี้? (ข้อมูลในทริปจะยังอยู่ แต่ชื่ออาจหายไป)')) {
-            Store.data.friends = Store.data.friends.filter(f => f.id !== friendId);
             Store.save();
             this.renderFriends();
+        });
+
+        // Logic: Back (Left)
+        document.getElementById('btn-back-friends').addEventListener('click', () => {
+            this.renderFriends();
+        });
+
+        // Logic: Close (Right)
+        const btnClose = document.getElementById('btn-close-friends-edit');
+        if (btnClose) {
+            btnClose.addEventListener('click', () => {
+                this.renderFriends();
+            });
         }
-    });
-}
-    }
-});
 
-// Update navigateTo to handle 'friends'
-const originalNavigateTo = ViewManager.navigateTo;
-ViewManager.navigateTo = function (viewName) {
-    if (viewName === 'friends') {
-        this.renderFriends();
-    } else {
-        originalNavigateTo.call(this, viewName);
-    }
-};
+        // Logic: Delete
+        const btnDelete = document.getElementById('btn-delete-friend');
+        if (btnDelete) {
+            btnDelete.addEventListener('click', () => {
+                if (confirm('ยืนยันลบรายชื่อนี้? (ข้อมูลในทริปจะยังอยู่ แต่ชื่ออาจหายไป)')) {
+                    Store.data.friends = Store.data.friends.filter(f => f.id !== friendId);
+                    Store.save();
+                    this.renderFriends();
+                }
+            });
+        }
 
-// Initialize App
-document.addEventListener('DOMContentLoaded', () => {
-    // Explicitly expose globals for inline handlers
-    window.Store = Store;
-    window.ViewManager = ViewManager;
+        // Update navigateTo to handle 'friends'
+        const originalNavigateTo = ViewManager.navigateTo;
+        ViewManager.navigateTo = function (viewName) {
+            if (viewName === 'friends') {
+                this.renderFriends();
+            } else {
+                originalNavigateTo.call(this, viewName);
+            }
+        };
 
-    Store.init();
-    ViewManager.init();
-});
+        // Initialize App
+        document.addEventListener('DOMContentLoaded', () => {
+            // Explicitly expose globals for inline handlers
+            window.Store = Store;
+            window.ViewManager = ViewManager;
 
-// --- Swipe Logic (Global) ---
-let touchStartX = 0;
-let touchCurrentX = 0;
-let activeSwipeEl = null;
+            Store.init();
+            ViewManager.init();
+        });
 
-window.handleSwipeStart = (e) => {
-    // Support Mouse or Touch
-    const isTouch = e.type === 'touchstart';
-    touchStartX = isTouch ? e.touches[0].clientX : e.clientX;
+        // --- Swipe Logic (Global) ---
+        let touchStartX = 0;
+        let touchCurrentX = 0;
+        let activeSwipeEl = null;
 
-    activeSwipeEl = e.currentTarget;
-    activeSwipeEl.style.transition = 'none'; // Follow finger instantly
-};
+        window.handleSwipeStart = (e) => {
+            // Support Mouse or Touch
+            const isTouch = e.type === 'touchstart';
+            touchStartX = isTouch ? e.touches[0].clientX : e.clientX;
 
-window.handleSwipeMove = (e) => {
-    if (!activeSwipeEl) return;
-    touchCurrentX = e.touches[0].clientX;
-    const diff = touchCurrentX - touchStartX;
+            activeSwipeEl = e.currentTarget;
+            activeSwipeEl.style.transition = 'none'; // Follow finger instantly
+        };
 
-    // Only allow left swipe (negative diff)
-    if (diff < 0) {
-        // Limit drag to -80px (button width) with some resistance
-        const translate = Math.max(diff, -100);
-        activeSwipeEl.style.transform = `translateX(${translate}px)`;
-    } else {
-        // Reset if dragging right
-        activeSwipeEl.style.transform = `translateX(0px)`;
-    }
-};
+        window.handleSwipeMove = (e) => {
+            if (!activeSwipeEl) return;
 
-window.handleSwipeEnd = (e) => {
-    if (!activeSwipeEl) return;
-    activeSwipeEl.style.transition = 'transform 0.2s ease-out';
-    const diff = touchCurrentX - touchStartX;
+            const isTouch = e.type === 'touchmove';
+            // Safety check for mouse vs touch
+            if (isTouch && (!e.touches || e.touches.length === 0)) return;
 
-    // Threshold to snap open (e.g. -40px)
-    if (diff < -40) {
-        activeSwipeEl.style.transform = `translateX(-80px)`;
-        activeSwipeEl.classList.add('swiped');
-    } else {
-        activeSwipeEl.style.transform = `translateX(0px)`;
-        activeSwipeEl.classList.remove('swiped');
-    }
+            touchCurrentX = isTouch ? e.touches[0].clientX : e.clientX;
+            const diff = touchCurrentX - touchStartX;
 
-    // Reset global vars
-    touchStartX = 0;
-    touchCurrentX = 0;
-    activeSwipeEl = null;
-};
+            // Only allow left swipe (negative diff)
+            if (diff < 0) {
+                // Limit drag to -80px (button width) with some resistance
+                const translate = Math.max(diff, -100);
+                activeSwipeEl.style.transform = `translateX(${translate}px)`;
+            } else {
+                // Reset if dragging right
+                activeSwipeEl.style.transform = `translateX(0px)`;
+            }
+        };
+
+        window.handleSwipeEnd = (e) => {
+            if (!activeSwipeEl) return;
+            activeSwipeEl.style.transition = 'transform 0.2s ease-out';
+            const diff = touchCurrentX - touchStartX;
+
+            // Threshold to snap open (e.g. -40px)
+            if (diff < -40) {
+                activeSwipeEl.style.transform = `translateX(-80px)`;
+                activeSwipeEl.classList.add('swiped');
+            } else {
+                activeSwipeEl.style.transform = `translateX(0px)`;
+                activeSwipeEl.classList.remove('swiped');
+            }
+
+            // Reset global vars
+            touchStartX = 0;
+            touchCurrentX = 0;
+            activeSwipeEl = null;
+        };
