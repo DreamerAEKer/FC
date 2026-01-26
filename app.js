@@ -905,8 +905,17 @@ const ViewManager = {
     },
 
     submitExpense(tripId) {
-        const amount = parseFloat(document.getElementById('inp-amount').value);
-        const title = document.getElementById('inp-title').value;
+        console.log("Starting submitExpense for:", tripId);
+
+        // 1. Validate Inputs
+        const amountEl = document.getElementById('inp-amount');
+        const titleEl = document.getElementById('inp-title');
+
+        if (!amountEl || !titleEl) throw new Error("Input elements not found");
+
+        const amount = parseFloat(amountEl.value);
+        const title = titleEl.value;
+
         const payerRadio = document.querySelector('input[name="payer"]:checked');
         const payerId = payerRadio ? payerRadio.value : null;
 
@@ -926,6 +935,14 @@ const ViewManager = {
             return;
         }
 
+        // 2. Collect Images Safe Check
+        let attachmentList = [];
+        try {
+            attachmentList = this.collectExpenseImages();
+        } catch (e) {
+            console.warn("Image collection failed:", e);
+        }
+
         const newExpense = {
             id: 'e' + Date.now(),
             tripId,
@@ -934,20 +951,33 @@ const ViewManager = {
             payerId,
             involvedIds,
             timestamp: Date.now(),
-            attachments: this.collectExpenseImages() // New Field
+            attachments: attachmentList
         };
 
+        // 3. Find Trip Safe Check
         const trip = Store.data.trips.find(t => t.id === tripId);
+        if (!trip) {
+            throw new Error(`Trip not found for ID: ${tripId}`);
+        }
+
         if (!trip.expenses) trip.expenses = [];
         trip.expenses.unshift(newExpense);
 
         Store.save();
 
-        // --- Prompt Generate Card ---
-        if (confirm('บันทึกแล้ว! สร้างการ์ดสรุปยอดเพื่อส่งให้เพื่อนเลยไหม?')) {
-            this.renderCardPreview(trip, newExpense);
-        } else {
-            this.renderTripDetail(tripId);
+        // 4. Render Card (Safe Wrap)
+        try {
+            // Delay slightly to allow UI to update if needed, or just run direct
+            if (confirm('บันทึกแล้ว! สร้างการ์ดสรุปยอดเพื่อส่งให้เพื่อนเลยไหม?')) {
+                this.renderCardPreview(trip, newExpense);
+            } else {
+                this.renderTripDetail(tripId);
+            }
+        } catch (e) {
+            console.error("Render Card/Detail Error", e);
+            alert("บันทึกข้อมูลแล้ว แต่เปิดหน้าถัดไปไม่สำเร็จ: " + e.message);
+            // Fallback
+            this.renderHome();
         }
     },
 
