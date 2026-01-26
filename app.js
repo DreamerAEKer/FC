@@ -736,6 +736,10 @@ const ViewManager = {
     renderCardPreview(trip, expense) {
         const payer = Store.data.friends.find(f => f.id === expense.payerId);
 
+        // Split Logic
+        const invCount = expense.involvedIds ? expense.involvedIds.length : 1;
+        const splitAmount = expense.amount / (invCount > 0 ? invCount : 1);
+
         // Custom Payment QR Logic
         const hasCustomQR = payer && payer.qrCode;
 
@@ -744,7 +748,7 @@ const ViewManager = {
         if (!hasCustomQR && payer && payer.phone) {
             let phone = payer.phone.replace(/[^0-9]/g, '');
             if (phone.startsWith('0')) phone = '66' + phone.substring(1);
-            promptPayPayload = this.generatePromptPayPayload(phone, expense.amount);
+            promptPayPayload = this.generatePromptPayPayload(phone, splitAmount); // Use Split Amount
         }
 
         // Data QR Payload (Keep for export logic, even if not shown in visual card)
@@ -760,11 +764,20 @@ const ViewManager = {
                     <!-- Decor -->
                     <div style="position: absolute; top:0; left:0; right:0; height: 8px; background: linear-gradient(135deg, #6200EE 0%, #3700b3 100%);"></div>
                     
-                    <div style="text-align: center; margin-bottom: 24px;">
+                    <div style="text-align: center; margin-bottom: 16px;">
                         <h4 style="color: #666; font-size: 0.9rem; margin:0;">${trip.name}</h4>
                         <div style="font-size: 1.5rem; font-weight: 600; margin: 8px 0;">${expense.title}</div>
-                        <div style="font-size: 2.5rem; font-weight: 700; color: #6200EE;">฿${expense.amount.toLocaleString()}</div>
-                        <div style="font-size: 0.8rem; color: #888;">${new Date(expense.timestamp).toLocaleDateString()} ${new Date(expense.timestamp).toLocaleTimeString()}</div>
+                        
+                        <!-- Split Amount Display -->
+                        <div style="font-size: 2.5rem; font-weight: 700; color: #6200EE;">
+                            ฿${splitAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                        </div>
+                        <div style="font-size: 0.8rem; color: #888; margin-bottom: 4px;">
+                            (ตกคนละ ${splitAmount.toLocaleString()} บาท)
+                        </div>
+                        <div style="font-size: 0.7rem; color: #aaa;">
+                            ยอดเต็ม: ฿${expense.amount.toLocaleString()} | หาร ${invCount} คน
+                        </div>
                     </div>
 
                     <div style="border-top: 2px dashed #eee; margin: 16px 0;"></div>
