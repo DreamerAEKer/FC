@@ -14,10 +14,30 @@ const Store = {
         const savedData = localStorage.getItem('saduak_data');
         if (savedData) {
             this.data = JSON.parse(savedData);
+
+            // Validation/Repair: Ensure default structure
+            if (!this.data.trips) this.data.trips = [];
+            if (!this.data.friends) this.data.friends = [];
+
+            // Restore defaults if friends list is empty (User Reset or Bug)
+            if (this.data.friends.length === 0) {
+                this.seedFriends();
+                this.save();
+            }
         } else {
             // Seed initial data for demo
             this.seedData();
         }
+    },
+
+    seedFriends() {
+        this.data.friends = [
+            { id: 'f_muay', name: 'หมวย', phone: '' },
+            { id: 'f_ple', name: 'เปิ้ล', phone: '' },
+            { id: 'f_best', name: 'เบส', phone: '' },
+            { id: 'f_jib', name: 'จิ๊บ', phone: '' },
+            { id: 'f_joy', name: 'จอย', phone: '' },
+        ];
     },
 
     save() {
@@ -26,18 +46,8 @@ const Store = {
 
     seedData() {
         // Initial dummy data
-        this.data.trips = [
-            // { id: 't1', name: 'ทริปเชียงใหม่', date: new Date().toISOString() }
-        ];
-
-        // Requested Defaults: หมวย, เปิ้ล, เบส, จิ๊บ, จอย
-        this.data.friends = [
-            { id: 'f_muay', name: 'หมวย', phone: '' },
-            { id: 'f_ple', name: 'เปิ้ล', phone: '' },
-            { id: 'f_best', name: 'เบส', phone: '' },
-            { id: 'f_jib', name: 'จิ๊บ', phone: '' },
-            { id: 'f_joy', name: 'จอย', phone: '' },
-        ];
+        this.data.trips = [];
+        this.seedFriends();
     },
 
     addTrip(name, photo = null) {
