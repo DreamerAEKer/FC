@@ -211,3 +211,50 @@ h3 {
 .hidden {
     display: none !important;
 }
+
+/* Swipe to Delete */
+.expense-item-container {
+    position: relative;
+    overflow: hidden;
+    /* Hide the button initially */
+    margin-bottom: 12px;
+    border-radius: 12px;
+    /* Ensure height matches content */
+}
+
+/* The red button sitting behind */
+.btn-delete-slide {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 80px;
+    /* Reveal width */
+    background: #FF5252;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+    /* Behind content? No, actually, standard approach:
+                  Content is on top (z-2), Button is behind (z-1). 
+                  But for touch, better: Button is absolute right. Content slides left.
+               */
+    border-radius: 0 12px 12px 0;
+}
+
+/* The card front that slides */
+.expense-card-front {
+    position: relative;
+    z-index: 2;
+    background: white;
+    border-radius: 12px;
+    transition: transform 0.2s ease-out;
+    /* Smooth snapping */
+    will-change: transform;
+}
+
+.expense-card-front.swiped {
+    transform: translateX(-80px);
+    /* Reveal button */
+}

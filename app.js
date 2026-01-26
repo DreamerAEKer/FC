@@ -73,6 +73,14 @@ const Store = {
         return newTrip;
     },
 
+    confirmDeleteExpense(tripId, expenseId) {
+        if (confirm('ยืนยันลบรายการนี้?')) {
+            this.deleteExpense(tripId, expenseId);
+            // Refresh View
+            ViewManager.renderTripDetail(tripId);
+        }
+    },
+
     addFriend(name, phone, photo = null, qrCode = null) {
         const newFriend = {
             id: 'f' + Date.now(),
@@ -486,7 +494,36 @@ const ViewManager = {
                 <!-- Expenses List -->
                 <h3>รายการล่าสุด</h3>
                 <div id="trip-expenses-list">
-                    ${this.renderExpenseList(trip.expenses || [])}
+                    ${trip.expenses && trip.expenses.length > 0 ? trip.expenses.map(e => {
+            const payer = Store.data.friends.find(f => f.id === e.payerId);
+
+            return `
+                        <div class="expense-item-container">
+                            <div class="btn-delete-slide" onclick="Store.confirmDeleteExpense('${tripId}', '${e.id}')">
+                                <span class="material-icons-round">delete</span>
+                            </div>
+                            <div class="expense-card-front" 
+                                 ontouchstart="handleSwipeStart(event)" 
+                                 ontouchmove="handleSwipeMove(event)" 
+                                 ontouchend="handleSwipeEnd(event)"
+                                 onclick="if(!this.classList.contains('swiped')) ViewManager.renderAddExpense('${tripId}', '${e.id}')">
+                                
+                                <div style="display:flex; justify-content:space-between; align-items:center; padding: 16px;">
+                                    <div style="display:flex; align-items:flex-start; gap:12px;">
+                                        <div style="background: #F5F7FA; padding: 10px; border-radius: 12px;">
+                                            <span class="material-icons-round" style="color: var(--primary-color);">receipt</span>
+                                        </div>
+                                        <div>
+                                            <h4 style="margin-bottom: 4px; font-size: 1rem;">${e.title}</h4>
+                                            <span style="font-size: 0.8rem; color: #888;">${payer ? payer.name : 'Unknown'} จ่าย</span>
+                                        </div>
+                                    </div>
+                                    <span style="font-weight: 600; color: var(--primary-color);">฿${e.amount.toLocaleString()}</span>
+                                </div>
+                            </div>
+                        </div>
+                        `;
+        }).join('') : '<div class="text-center" style="color:#aaa; padding: 20px;">ยังไม่มีรายการ</div>'}
                 </div>
             </div>
         `;
@@ -2461,3 +2498,50 @@ document.addEventListener('DOMContentLoaded', () => {
     Store.init();
     ViewManager.init();
 });
+
+// --- Swipe Logic (Global) ---
+let touchStartX = 0;
+let touchCurrentX = 0;
+let activeSwipeEl = null;
+
+window.handleSwipeStart = (e) => {
+    touchStartX = e.touches[0].clientX;
+    activeSwipeEl = e.currentTarget;
+    activeSwipeEl.style.transition = 'none'; // Follow finger instantly
+};
+
+window.handleSwipeMove = (e) => {
+    if (!activeSwipeEl) return;
+    touchCurrentX = e.touches[0].clientX;
+    const diff = touchCurrentX - touchStartX;
+
+    // Only allow left swipe (negative diff)
+    if (diff < 0) {
+        // Limit drag to -80px (button width) with some resistance
+        const translate = Math.max(diff, -100);
+        activeSwipeEl.style.transform = `translateX(${translate}px)`;
+    } else {
+        // Reset if dragging right
+        activeSwipeEl.style.transform = `translateX(0px)`;
+    }
+};
+
+window.handleSwipeEnd = (e) => {
+    if (!activeSwipeEl) return;
+    activeSwipeEl.style.transition = 'transform 0.2s ease-out';
+    const diff = touchCurrentX - touchStartX;
+
+    // Threshold to snap open (e.g. -40px)
+    if (diff < -40) {
+        activeSwipeEl.style.transform = `translateX(-80px)`;
+        activeSwipeEl.classList.add('swiped');
+    } else {
+        activeSwipeEl.style.transform = `translateX(0px)`;
+        activeSwipeEl.classList.remove('swiped');
+    }
+
+    // Reset global vars
+    touchStartX = 0;
+    touchCurrentX = 0;
+    activeSwipeEl = null;
+};
