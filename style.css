@@ -82,7 +82,7 @@ body {
     flex: 1;
     overflow-y: auto;
     padding: var(--spacing-md);
-    padding-bottom: 80px; /* Space for bottom nav */
+    padding-bottom: 140px; /* Space for bottom nav + FAB + Safe Area */
 }
 
 /* Typography & Components */
