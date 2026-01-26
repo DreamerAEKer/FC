@@ -1100,14 +1100,50 @@ const ViewManager = {
                 });
             }
 
-            new QRCode(document.getElementById("qrcode-data"), {
-                text: syncStr,
-                width: 80,
-                height: 80,
-                colorDark: "#6200EE",
-                colorLight: "#ffffff",
-                correctLevel: QRCode.CorrectLevel.L
-            });
+            if (syncStr) {
+                const qrContainer = document.getElementById("qrcode-data");
+                if (syncStr.length < 2200) {
+                    try {
+                        new QRCode(qrContainer, {
+                            text: syncStr,
+                            width: 80,
+                            height: 80,
+                            colorDark: "#6200EE",
+                            colorLight: "#ffffff",
+                            correctLevel: QRCode.CorrectLevel.L
+                        });
+                    } catch (qrErr) {
+                        console.error("QR Gen Error:", qrErr);
+                        renderCopyFallback(qrContainer);
+                    }
+                } else {
+                    renderCopyFallback(qrContainer);
+                }
+            } else {
+                document.getElementById("qrcode-data").innerHTML = "<span style='font-size:0.6rem; color:#ccc;'>ไม่มีข้อมูล</span>";
+            }
+
+            function renderCopyFallback(container) {
+                container.innerHTML = `
+                    <button id="btn-copy-data-qr" class="btn" style="background: #f8f9fa; border: 1px dashed #ccc; padding: 0; border-radius: 12px; display:flex; flex-direction:column; align-items:center; gap:4px; width:80px; height:80px; justify-content:center; cursor: pointer;">
+                        <span class="material-icons-round" style="color: #6200EE; font-size: 24px;">content_copy</span>
+                        <span style="font-size: 0.6rem; color: #666; font-weight: 500;">คัดลอกโค้ด</span>
+                    </button>
+                `;
+
+                setTimeout(() => {
+                    const btn = document.getElementById('btn-copy-data-qr');
+                    if (btn) {
+                        btn.addEventListener('click', () => {
+                            if (navigator.clipboard) {
+                                navigator.clipboard.writeText(syncStr).then(() => alert('คัดลอกโค้ดข้อมูลแล้ว!\nส่งให้เพื่อนวางในแอปได้เลย'));
+                            } else {
+                                prompt("กด Copy โค้ดด้านล่าง:", syncStr);
+                            }
+                        });
+                    }
+                }, 0);
+            }
         }
 
         // Listeners
