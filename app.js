@@ -806,51 +806,45 @@ const ViewManager = {
         let title = null;
 
         // 1. Find Amount
-        // Regex for currency: 100.00, 1,000.00
         const moneyRegex = /([\d,]+\.\d{2})/;
-
-        // Strategy A: Look for keywords, prioritizing "Net" / "สุทธิ"
         let foundNet = false;
 
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i].toLowerCase();
 
-            // Skip lines that look like specific discounts or tax-only if not desired, 
-            // but primarily skip "Discount" lines to avoid grabbing the discount amount.
-            if (line.includes('ส่วนลด') || line.includes('discount')) continue;
+            // EXCLUSION: Skip lines that are specifically Tax, VAT, or Discount
+            // "ภาษี" = Tax, "ส่วนลด" = Discount
+            if (line.includes('ส่วนลด') || line.includes('discount') ||
+                line.includes('tax') || line.includes('vat') || line.includes('ภาษี')) {
+                continue;
+            }
 
             const match = line.match(moneyRegex);
             if (!match) continue;
 
             const val = parseFloat(match[1].replace(/,/g, ''));
 
-            // High Priority: "Net", "สุทธิ"
-            if (line.includes('net') || line.includes('สุทธิ') || line.includes('grand total')) {
+            // High Priority Keywords: "Net", "สุทธิ", "Grand Total", "ทั้งหมด"
+            if (line.includes('net') || line.includes('สุทธิ') || line.includes('grand total') || line.includes('ทั้งหมด')) {
                 amount = val;
                 foundNet = true;
-                bestAmountLine = i;
-                // If we found Net, we generally trust it most. 
-                // However, keep looping in case there's a "Net" lower down? 
-                // Usually the last "Net" is the right one.
             }
-            // Low Priority: "Total", "รวม", "Amount" (Only if we haven't found Net yet)
-            else if (!foundNet && (line.includes('total') || line.includes('รวม') || line.includes('amount'))) {
-                // If we already have a candidate from a previous line (like sub-total),
-                // this might be the grand total or just another sub-total.
-                // Usually the bottom-most "Total" is better, UNLESS it's followed by a Discount line.
-                // But we filtered Discount lines above.
+            // Medium Priority: "Total", "รวม", "Amount" (Only if we haven't found Net yet)
+            else if (!foundNet && (line.includes('total') || line.includes('รวม') || line.includes('amount') || line.includes('ยอดรวม'))) {
                 amount = val;
-                bestAmountLine = i;
             }
         }
 
         // Strategy B: If still no amount, look for the largest number at the bottom half
         if (!amount) {
-            // Check last 7 lines
+            // Check last 10 lines
             for (let i = lines.length - 1; i >= Math.max(0, lines.length - 15); i--) {
                 const line = lines[i].toLowerCase();
-                // Safety: Avoid discount lines here too
-                if (line.includes('ส่วนลด') || line.includes('discount') || line.includes('%')) continue;
+                // Safety: Avoid tax/discount lines here too
+                if (line.includes('ส่วนลด') || line.includes('discount') ||
+                    line.includes('tax') || line.includes('vat') || line.includes('ภาษี') || line.includes('%')) {
+                    continue;
+                }
 
                 const match = line.match(moneyRegex);
                 if (match) {
@@ -864,15 +858,20 @@ const ViewManager = {
         }
 
         // 2. Find Title (Vendor Name)
-        // Usually the first non-empty line, skipping common header words
+        // Heuristic: First line that isn't a header, looks like text, and is long enough.
         for (let i = 0; i < Math.min(5, lines.length); i++) {
             const line = lines[i];
+
             // Skip common headers
             if (line.match(/(tax invoice|receipt|ใบเสร็จ|ใบกำกับ|table|date)/i)) continue;
             // Skip pure numbers or dates
-            if (line.match(/^[\d\s\/\-\.:]+$/)) continue; // e.g. "20/10/2023 10:00"
+            if (line.match(/^[\d\s\/\-\.:]+$/)) continue;
 
-            if (line.length > 2) {
+            // Valid Title Check: Must have at least 3 chars, not start with special char
+            if (line.length > 3 && !line.match(/^[#@!&%-]/)) {
+                // If text seems like gibberish (mostly english consonants without vowels? hard to detect reliably)
+                // For now, accept it. User said "If < 100% unsure, leave empty". Use empty if really unsure.
+                // We'll trust strict length > 3 for now.
                 title = line;
                 break;
             }
