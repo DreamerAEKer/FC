@@ -29,6 +29,15 @@ const Store = {
         this.data.trips = [
             // { id: 't1', name: 'ทริปเชียงใหม่', date: new Date().toISOString() }
         ];
+
+        // Requested Defaults: หมวย, เปิ้ล, เบส, จิ๊บ, จอย
+        this.data.friends = [
+            { id: 'f_muay', name: 'หมวย', phone: '' },
+            { id: 'f_ple', name: 'เปิ้ล', phone: '' },
+            { id: 'f_best', name: 'เบส', phone: '' },
+            { id: 'f_jib', name: 'จิ๊บ', phone: '' },
+            { id: 'f_joy', name: 'จอย', phone: '' },
+        ];
     },
 
     addTrip(name) {
