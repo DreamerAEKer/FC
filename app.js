@@ -1175,7 +1175,14 @@ const ViewManager = {
         });
 
         // Remove Photo Logic
-        document.getElementById('btn-remove-trip-photo').addEventListener('click', (e) => {
+        const btnRemove = document.getElementById('btn-remove-trip-photo');
+
+        // Prevent Drag Logic interactions
+        ['mousedown', 'touchstart'].forEach(evt =>
+            btnRemove.addEventListener(evt, e => e.stopPropagation())
+        );
+
+        btnRemove.addEventListener('click', (e) => {
             e.stopPropagation(); // Prevent triggering other clicks? Not needed usually but good practice
             e.preventDefault();
 
@@ -1183,7 +1190,7 @@ const ViewManager = {
             previewImg.src = '';
             previewImg.style.display = 'none';
             document.getElementById('placeholder-text').style.display = 'block';
-            document.getElementById('btn-remove-trip-photo').style.display = 'none';
+            btnRemove.style.display = 'none';
             zoomSlider.style.display = 'none';
 
             photoInput.value = ''; // Reset input
