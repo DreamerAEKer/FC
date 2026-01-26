@@ -65,6 +65,19 @@ const Store = {
         return newTrip;
     },
 
+    addFriend(name, phone, photo = null, qrCode = null) {
+        const newFriend = {
+            id: 'f' + Date.now(),
+            name,
+            phone,
+            photo,
+            qrCode
+        };
+        this.data.friends.push(newFriend);
+        this.save();
+        return newFriend;
+    },
+
     // --- Distributed Sync Logic ---
 
     /**
@@ -444,7 +457,7 @@ const ViewManager = {
             if (code) {
                 // In a real app we might use navigator.share
                 navigator.clipboard.writeText(code).then(() => {
-                    alert('ก๊อปปี้โค้ดแล้ว! ส่งให้เพื่อนในแชทได้เลยครับ (โค้ดนี้ใช้รวมข้อมูลได้ด้วย)');
+                    alert('ก๊อปปี้โค้ดแล้ว! ส่งให้เพื่อนในแชทได้เลย (โค้ดนี้ใช้รวมข้อมูลได้ด้วย)');
                 });
             }
         });
@@ -455,7 +468,7 @@ const ViewManager = {
 
         document.getElementById('btn-add-expense').addEventListener('click', () => {
             if (!trip.members || trip.members.length === 0) {
-                alert('ต้องมีสมาชิกในทริปก่อนจดค่าใช้จ่ายครับ\nโปรดเพิ่มเพื่อนเข้าทริปก่อนนะครับ');
+                alert('ต้องมีสมาชิกในทริปก่อนจดค่าใช้จ่าย/nโปรดเพิ่มเพื่อนเข้าทริปก่อน');
                 this.promptAddMemberToTrip(tripId);
                 return;
             }
@@ -464,7 +477,7 @@ const ViewManager = {
 
         document.getElementById('btn-settle').addEventListener('click', () => {
             if (!trip.members || trip.members.length === 0) {
-                alert('ต้องมีสมาชิกในทริปก่อนครับ\nโปรดเพิ่มเพื่อนเข้าทริปก่อนนะครับ');
+                alert('ต้องมีสมาชิกในทริปก่อน\nโปรดเพิ่มเพื่อนเข้าทริปก่อน');
                 this.promptAddMemberToTrip(tripId);
                 return;
             }
@@ -723,16 +736,18 @@ const ViewManager = {
     renderCardPreview(trip, expense) {
         const payer = Store.data.friends.find(f => f.id === expense.payerId);
 
-        // Basic PromptPay Logic
+        // Custom Payment QR Logic
+        const hasCustomQR = payer && payer.qrCode;
+
+        // Basic PromptPay Logic (Fallback)
         let promptPayPayload = null;
-        if (payer && payer.phone) {
+        if (!hasCustomQR && payer && payer.phone) {
             let phone = payer.phone.replace(/[^0-9]/g, '');
             if (phone.startsWith('0')) phone = '66' + phone.substring(1);
             promptPayPayload = this.generatePromptPayPayload(phone, expense.amount);
         }
 
-        // Data QR Payload
-        // Use standard export to ensure members are embedded and logic is consistent
+        // Data QR Payload (Keep for export logic, even if not shown in visual card)
         const syncStr = Store.exportTripString(trip.id, false);
 
         const mainContent = document.getElementById('main-content');
@@ -754,22 +769,31 @@ const ViewManager = {
 
                     <div style="border-top: 2px dashed #eee; margin: 16px 0;"></div>
 
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                         <div style="text-align: center; flex: 1;">
-                            <div style="font-size: 0.8rem; color: #888; margin-bottom: 4px;">จ่ายเงินให้</div>
-                            <div style="font-weight: 600; font-size: 0.9rem;">${payer ? payer.name : 'Unknown'}</div>
-                            ${promptPayPayload ? `
-                                <div id="qrcode-payment" style="margin-top: 8px; display:flex; justify-content:center;"></div>
-                                <div style="font-size: 0.6rem; color: #aaa; margin-top: 2px;">PromptPay</div>
-                            ` : '<div style="font-size:0.7rem; color:#ccc; margin-top:8px;">(ไม่มีเบอร์)</div>'}
-                         </div>
-                         <div style="text-align: center; flex: 1; border-left: 1px solid #eee;">
-                            <div style="font-size: 0.8rem; color: #888; margin-bottom: 4px;">บันทึกข้อมูล</div>
-                            <div style="font-weight: 600; font-size: 0.9rem;">สแกนเพื่อรวมบิล</div>
-                            <div id="qrcode-data" style="margin-top: 8px; display:flex; justify-content:center;"></div>
-                            <div style="font-size: 0.6rem; color: #aaa; margin-top: 2px;">App Data</div>
-                         </div>
-                    </div>
+                    ${hasCustomQR ? `
+                        <!-- Custom QR Mode -->
+                        <div style="text-align: center;">
+                             <div style="font-size: 0.8rem; color: #888; margin-bottom: 8px;">สแกนจ่ายให้: <b>${payer.name}</b></div>
+                             <img src="${payer.qrCode}" style="width: 100%; max-width: 220px; border-radius: 8px; border: 1px solid #eee;">
+                        </div>
+                    ` : `
+                        <!-- Fallback Mode -->
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                             <div style="text-align: center; flex: 1;">
+                                <div style="font-size: 0.8rem; color: #888; margin-bottom: 4px;">จ่ายเงินให้</div>
+                                <div style="font-weight: 600; font-size: 0.9rem;">${payer ? payer.name : 'Unknown'}</div>
+                                ${promptPayPayload ? `
+                                    <div id="qrcode-payment" style="margin-top: 8px; display:flex; justify-content:center;"></div>
+                                    <div style="font-size: 0.6rem; color: #aaa; margin-top: 2px;">PromptPay</div>
+                                ` : '<div style="font-size:0.7rem; color:#ccc; margin-top:8px;">(ไม่มีเบอร์)</div>'}
+                             </div>
+                             <div style="text-align: center; flex: 1; border-left: 1px solid #eee;">
+                                <div style="font-size: 0.8rem; color: #888; margin-bottom: 4px;">บันทึกข้อมูล</div>
+                                <div style="font-weight: 600; font-size: 0.9rem;">สแกนเพื่อรวมบิล</div>
+                                <div id="qrcode-data" style="margin-top: 8px; display:flex; justify-content:center;"></div>
+                                <div style="font-size: 0.6rem; color: #aaa; margin-top: 2px;">App Data</div>
+                             </div>
+                        </div>
+                    `}
                     
                     <div style="text-align:center; font-size: 0.7rem; color: #ccc; margin-top: 16px;">
                         สะดวกแบบนี้ (Saduak Bab Nee)
@@ -783,26 +807,28 @@ const ViewManager = {
             </div>
         `;
 
-        // Generate QRs
-        if (promptPayPayload) {
-            new QRCode(document.getElementById("qrcode-payment"), {
-                text: promptPayPayload,
+        // Generate Fallback QRs if needed
+        if (!hasCustomQR) {
+            if (promptPayPayload) {
+                new QRCode(document.getElementById("qrcode-payment"), {
+                    text: promptPayPayload,
+                    width: 80,
+                    height: 80,
+                    colorDark: "#000000",
+                    colorLight: "#ffffff",
+                    correctLevel: QRCode.CorrectLevel.L
+                });
+            }
+
+            new QRCode(document.getElementById("qrcode-data"), {
+                text: syncStr,
                 width: 80,
                 height: 80,
-                colorDark: "#000000",
+                colorDark: "#6200EE",
                 colorLight: "#ffffff",
                 correctLevel: QRCode.CorrectLevel.L
             });
         }
-
-        new QRCode(document.getElementById("qrcode-data"), {
-            text: syncStr,
-            width: 80,
-            height: 80,
-            colorDark: "#6200EE",
-            colorLight: "#ffffff",
-            correctLevel: QRCode.CorrectLevel.L
-        });
 
         // Listeners
         // Listeners for Card Preview
@@ -949,7 +975,7 @@ const ViewManager = {
         let j = 0;
 
         if (debtors.length === 0 && creditors.length === 0) {
-            return `<div style="text-align:center; color:#888;">เคลียร์หมดแล้วจ้า!</div>`;
+            return `<div style="text-align:center; color:#888;">เคลียร์ยอดครบแล้ว</div>`;
         }
 
         while (i < debtors.length && j < creditors.length) {
@@ -1617,21 +1643,33 @@ const ViewManager = {
                 return;
             }
 
-            const newFriend = {
-                id: 'f' + Date.now(),
-                name,
-                phone,
-                photo: null
-            };
-
-            Store.data.friends.push(newFriend);
-            Store.save();
+            const newFriend = Store.addFriend(name, phone);
 
             if (onSuccessCallback) onSuccessCallback(newFriend.id);
             modalContainer.innerHTML = '';
         });
     }
 };
+
+// Assuming Store is defined elsewhere, we'll add the method to it.
+// If Store is not globally accessible, this might need adjustment.
+if (typeof Store !== 'undefined') {
+    Object.assign(Store, {
+        addFriend(name, phone, photo = null, qrCode = null) {
+            const newFriend = {
+                id: 'f' + Date.now(),
+                name,
+                phone,
+                photo,
+                qrCode // New Field
+            };
+            this.data.friends.push(newFriend);
+            this.save();
+            return newFriend;
+        },
+    });
+}
+
 
 /**
  * Extended ViewManager for Friends
@@ -1787,6 +1825,22 @@ Object.assign(ViewManager, {
                         <div style="font-size: 0.75rem; color: #888; margin-top: 4px;">ใส่เบอร์เพื่อให้สร้าง QR PromptPay ได้ถูกต้อง</div>
                     </div>
 
+                    <!-- Payment QR Upload -->
+                    <div class="input-group" style="margin-bottom: 32px;">
+                        <label style="display:block; margin-bottom:8px; font-weight:500;">รูป QR Code สำหรับรับเงิน</label>
+                        <div id="qr-upload-area" style="border: 2px dashed #ddd; border-radius: 12px; padding: 20px; text-align: center; background: #fafafa; cursor: pointer; position: relative; overflow: hidden;">
+                            ${friend.qrCode ?
+                `<img id="preview-qr-img" src="${friend.qrCode}" style="max-width: 100%; max-height: 200px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">` :
+                `<div id="qr-placeholder" style="display:flex; flex-direction:column; align-items:center; gap:8px; color:#aaa;">
+                                    <span class="material-icons-round" style="font-size: 32px;">qr_code_scanner</span>
+                                    <span style="font-size: 0.9rem;">แตะเพื่ออัพโหลดรูป QR</span>
+                                 </div>`
+            }
+                            <input type="file" id="inp-friend-qr" accept="image/*" style="opacity: 0; position: absolute; top:0; left:0; width:100%; height:100%; cursor: pointer;">
+                        </div>
+                        <div style="font-size: 0.75rem; color: #888; margin-top: 4px;">ถ้ามีรูปนี้ จะแสดงแทนการสร้าง QR จากเบอร์โทร</div>
+                    </div>
+
                     <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 16px; font-size: 1rem;">
                         ${isEdit ? 'บันทึกการแก้ไข' : 'เพิ่มเพื่อน'}
                     </button>
@@ -1847,6 +1901,53 @@ Object.assign(ViewManager, {
             reader.readAsDataURL(file);
         });
 
+        // Helper: QR Selection & Resize
+        const qrInput = document.getElementById('inp-friend-qr');
+        let currentQrBase64 = friend.qrCode;
+
+        qrInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    // Resize Logic (Max 600x600 for QR)
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    const MAX_SIZE = 600;
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > MAX_SIZE) {
+                            height *= MAX_SIZE / width;
+                            width = MAX_SIZE;
+                        }
+                    } else {
+                        if (height > MAX_SIZE) {
+                            width *= MAX_SIZE / height;
+                            height = MAX_SIZE;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    ctx.drawImage(img, 0, 0, width, height);
+                    currentQrBase64 = canvas.toDataURL('image/jpeg', 0.9); // High quality for QR
+
+                    // Update Preview
+                    const qrArea = document.getElementById('qr-upload-area');
+                    qrArea.innerHTML = `<img id="preview-qr-img" src="${currentQrBase64}" style="max-width: 100%; max-height: 200px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">`;
+                    qrArea.appendChild(qrInput); // Re-attach input
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+
+
         // Logic: Save
         document.getElementById('form-friend').addEventListener('submit', (e) => {
             e.preventDefault();
@@ -1872,6 +1973,7 @@ Object.assign(ViewManager, {
                     target.name = name;
                     target.phone = phone;
                     target.photo = currentPhotoBase64;
+                    target.qrCode = currentQrBase64; // Save QR
                 }
             } else {
                 // Add New
