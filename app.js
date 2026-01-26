@@ -1045,8 +1045,12 @@ const ViewManager = {
                             <input type="file" id="inp-trip-photo" accept="image/*" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
                         </div>
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-top: 8px;">
-                             <span style="font-size:0.7rem; color:#888;">ลากเพื่อจัดตำแหน่ง</span>
-                             <input type="range" id="zoom-slider" min="1" max="3" step="0.1" value="1" style="width: 100px; display:none;">
+                             <span style="font-size:0.7rem; color:#888;">ลากเพื่อจัดตำแหน่ง (Slide to Pan)</span>
+                             <div style="display:flex; align-items:center; gap:8px;">
+                                <span class="material-icons-round" style="font-size:16px; color:#aaa;">remove_circle_outline</span>
+                                <input type="range" id="zoom-slider" min="0.2" max="3" step="0.05" value="1" style="width: 100px; display:none;">
+                                <span class="material-icons-round" style="font-size:16px; color:#aaa;">add_circle_outline</span>
+                             </div>
                         </div>
                     </div>
 
@@ -1105,6 +1109,10 @@ const ViewManager = {
                 previewImg.style.width = '100%';
                 previewImg.style.height = 'auto';
             }
+            // Reset Scale
+            currentScale = 1;
+            zoomSlider.value = 1;
+
             // Center
             centerImage();
         }
