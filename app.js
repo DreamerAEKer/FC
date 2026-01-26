@@ -1679,239 +1679,224 @@ const ViewManager = {
                 alert('โหลดรูปไม่สำเร็จ');
             }
         });
-        const img = new Image();
-        img.onload = () => {
-            originalImage = img;
-            previewImg.src = img.src;
-            previewImg.style.display = 'block';
-            document.getElementById('placeholder-text').style.display = 'none';
-            document.getElementById('btn-remove-trip-photo').style.display = 'flex'; // Show remove btn
-            photoInput.style.pointerEvents = 'none'; // Switch to drag mode
-            zoomSlider.style.display = 'block';
 
-            fitImageToContainer();
+
+        // Remove Photo Logic
+        const btnRemove = document.getElementById('btn-remove-trip-photo');
+
+        // Prevent Drag Logic interactions
+        ['mousedown', 'touchstart'].forEach(evt =>
+            btnRemove.addEventListener(evt, e => e.stopPropagation())
+        );
+
+        btnRemove.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent triggering other clicks? Not needed usually but good practice
+            e.preventDefault();
+
+            originalImage = null;
+            previewImg.src = '';
+            previewImg.style.display = 'none';
+            document.getElementById('placeholder-text').style.display = 'block';
+            btnRemove.style.display = 'none';
+            zoomSlider.style.display = 'none';
+
+            photoInput.value = ''; // Reset input
+            photoInput.style.pointerEvents = 'auto'; // Re-enable click
+
+            // Important: Update trip state so if saved, it's cleared
+            trip.photo = null;
+        });
+
+        // Zoom
+        zoomSlider.addEventListener('input', (e) => {
+            currentScale = parseFloat(e.target.value);
+            updateTransform();
+        });
+
+        // Drag Logic (Mouse + Touch)
+        const startDrag = (e) => {
+            if (!originalImage) return; // Only if image loaded
+            // If clicking the file input, let it handle file. 
+            // But we disabled pointerEvents on file input when image loaded.
+
+            isDragging = true;
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+            startX = clientX;
+            startY = clientY;
+            initialX = posX;
+            initialY = posY;
+            cropContainer.style.cursor = 'grabbing';
+            e.preventDefault(); // Prevent scroll on mobile
         };
-        img.src = evt.target.result;
-    };
-    reader.readAsDataURL(file);
-});
 
-// Remove Photo Logic
-const btnRemove = document.getElementById('btn-remove-trip-photo');
+        const moveDrag = (e) => {
+            if (!isDragging) return;
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
-// Prevent Drag Logic interactions
-['mousedown', 'touchstart'].forEach(evt =>
-    btnRemove.addEventListener(evt, e => e.stopPropagation())
-);
+            const dx = clientX - startX;
+            const dy = clientY - startY;
 
-btnRemove.addEventListener('click', (e) => {
-    e.stopPropagation(); // Prevent triggering other clicks? Not needed usually but good practice
-    e.preventDefault();
+            posX = initialX + dx;
+            posY = initialY + dy;
+            updateTransform();
+        };
 
-    originalImage = null;
-    previewImg.src = '';
-    previewImg.style.display = 'none';
-    document.getElementById('placeholder-text').style.display = 'block';
-    btnRemove.style.display = 'none';
-    zoomSlider.style.display = 'none';
+        const stopDrag = () => {
+            isDragging = false;
+            cropContainer.style.cursor = 'move';
+        };
 
-    photoInput.value = ''; // Reset input
-    photoInput.style.pointerEvents = 'auto'; // Re-enable click
+        cropContainer.addEventListener('mousedown', startDrag);
+        cropContainer.addEventListener('touchstart', startDrag);
 
-    // Important: Update trip state so if saved, it's cleared
-    trip.photo = null;
-});
+        window.addEventListener('mousemove', moveDrag);
+        window.addEventListener('touchmove', moveDrag, { passive: false });
 
-// Zoom
-zoomSlider.addEventListener('input', (e) => {
-    currentScale = parseFloat(e.target.value);
-    updateTransform();
-});
+        window.addEventListener('mouseup', stopDrag);
+        window.addEventListener('touchend', stopDrag);
 
-// Drag Logic (Mouse + Touch)
-const startDrag = (e) => {
-    if (!originalImage) return; // Only if image loaded
-    // If clicking the file input, let it handle file. 
-    // But we disabled pointerEvents on file input when image loaded.
+        // --- End UI Logic ---
 
-    isDragging = true;
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        document.getElementById('inp-trip-name').focus();
 
-    startX = clientX;
-    startY = clientY;
-    initialX = posX;
-    initialY = posY;
-    cropContainer.style.cursor = 'grabbing';
-    e.preventDefault(); // Prevent scroll on mobile
-};
+        // Voice Logic
+        document.getElementById('btn-voice-trip').addEventListener('click', () => {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) return alert('ใช้ Voice ไม่ได้ในเบราว์เซอร์นี้');
 
-const moveDrag = (e) => {
-    if (!isDragging) return;
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'th-TH';
+            const btn = document.getElementById('btn-voice-trip');
+            btn.style.background = '#ff5252';
+            btn.style.color = 'white';
+            recognition.start();
+            recognition.onresult = (e) => { document.getElementById('inp-trip-name').value = e.results[0][0].transcript; };
+            recognition.onspeechend = () => { recognition.stop(); btn.style.background = '#eee'; btn.style.color = 'black'; };
+            recognition.onerror = () => {
+                btn.style.background = '#eee';
+                btn.style.color = 'black';
+            };
+        });
 
-    const dx = clientX - startX;
-    const dy = clientY - startY;
+        document.getElementById('btn-cancel-trip-modal').addEventListener('click', () => {
+            // Cleanup global listeners to avoid leaks if reopening
+            window.removeEventListener('mousemove', moveDrag);
+            window.removeEventListener('touchmove', moveDrag);
+            window.removeEventListener('mouseup', stopDrag);
+            window.removeEventListener('touchend', stopDrag);
+            modalContainer.innerHTML = '';
+        });
 
-    posX = initialX + dx;
-    posY = initialY + dy;
-    updateTransform();
-};
+        // X Button Listener (Same logic as cancel)
+        const btnCloseX = document.getElementById('btn-close-modal-x');
+        if (btnCloseX) {
+            btnCloseX.addEventListener('click', () => {
+                window.removeEventListener('mousemove', moveDrag);
+                window.removeEventListener('touchmove', moveDrag);
+                window.removeEventListener('mouseup', stopDrag);
+                window.removeEventListener('touchend', stopDrag);
+                document.getElementById('modal-container').innerHTML = '';
+            });
+        }
 
-const stopDrag = () => {
-    isDragging = false;
-    cropContainer.style.cursor = 'move';
-};
+        document.getElementById('btn-save-trip-modal').addEventListener('click', () => {
+            const name = document.getElementById('inp-trip-name').value.trim();
+            if (!name) return alert('กรุณาใส่ชื่อทริป');
 
-cropContainer.addEventListener('mousedown', startDrag);
-cropContainer.addEventListener('touchstart', startDrag);
+            let finalPhoto = trip.photo;
 
-window.addEventListener('mousemove', moveDrag);
-window.addEventListener('touchmove', moveDrag, { passive: false });
+            // Crop Logic
+            if (originalImage) {
+                const canvas = document.createElement('canvas');
+                // Target Output Size (e.g. 2:1 ratio for nice banner)
+                canvas.width = 800;
+                canvas.height = 400;
+                const ctx = canvas.getContext('2d');
 
-window.addEventListener('mouseup', stopDrag);
-window.addEventListener('touchend', stopDrag);
+                // Get rendered size relative to container
+                const imgRenderedWidth = previewImg.offsetWidth * currentScale;
+                const imgRenderedHeight = previewImg.offsetHeight * currentScale;
+                const containerWidth = cropContainer.clientWidth;
+                const containerHeight = cropContainer.clientHeight;
 
-// --- End UI Logic ---
+                // Calculate scale factor between Container and Canvas
+                const scaleX = canvas.width / containerWidth;
+                const scaleY = canvas.height / containerHeight;
+                // We use one scale to maintain aspect ratio, but here we want to map explicitly
+                // We draw the image at the position relative to the canvas 0,0 matched to container 0,0
+                // PosX, PosY is relative to container top-left
 
-document.getElementById('inp-trip-name').focus();
+                const drawX = posX * scaleX; // Scaled position
+                const drawY = posY * scaleY;
+                const drawW = imgRenderedWidth * scaleX;
+                const drawH = imgRenderedHeight * scaleX; // Assume square pixels
 
-// Voice Logic
-document.getElementById('btn-voice-trip').addEventListener('click', () => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) return alert('ใช้ Voice ไม่ได้ในเบราว์เซอร์นี้');
+                // Fill background (if image dragged too far)
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'th-TH';
-    const btn = document.getElementById('btn-voice-trip');
-    btn.style.background = '#ff5252';
-    btn.style.color = 'white';
-    recognition.start();
-    recognition.onresult = (e) => { document.getElementById('inp-trip-name').value = e.results[0][0].transcript; };
-    recognition.onspeechend = () => { recognition.stop(); btn.style.background = '#eee'; btn.style.color = 'black'; };
-    recognition.onerror = () => {
-        btn.style.background = '#eee';
-        btn.style.color = 'black';
-    };
-});
+                ctx.drawImage(originalImage, drawX, drawY, drawW, drawH);
 
-document.getElementById('btn-cancel-trip-modal').addEventListener('click', () => {
-    // Cleanup global listeners to avoid leaks if reopening
-    window.removeEventListener('mousemove', moveDrag);
-    window.removeEventListener('touchmove', moveDrag);
-    window.removeEventListener('mouseup', stopDrag);
-    window.removeEventListener('touchend', stopDrag);
-    modalContainer.innerHTML = '';
-});
+                finalPhoto = canvas.toDataURL('image/jpeg', 0.85);
+            }
 
-// X Button Listener (Same logic as cancel)
-const btnCloseX = document.getElementById('btn-close-modal-x');
-if (btnCloseX) {
-    btnCloseX.addEventListener('click', () => {
-        window.removeEventListener('mousemove', moveDrag);
-        window.removeEventListener('touchmove', moveDrag);
-        window.removeEventListener('mouseup', stopDrag);
-        window.removeEventListener('touchend', stopDrag);
-        document.getElementById('modal-container').innerHTML = '';
-    });
-}
+            if (isEdit) {
+                trip.name = name;
+                trip.photo = finalPhoto;
+                Store.save();
+                this.renderTripDetail(tripId);
+            } else {
+                Store.addTrip(name, finalPhoto);
+                this.renderTripList();
+            }
 
-document.getElementById('btn-save-trip-modal').addEventListener('click', () => {
-    const name = document.getElementById('inp-trip-name').value.trim();
-    if (!name) return alert('กรุณาใส่ชื่อทริป');
-
-    let finalPhoto = trip.photo;
-
-    // Crop Logic
-    if (originalImage) {
-        const canvas = document.createElement('canvas');
-        // Target Output Size (e.g. 2:1 ratio for nice banner)
-        canvas.width = 800;
-        canvas.height = 400;
-        const ctx = canvas.getContext('2d');
-
-        // Get rendered size relative to container
-        const imgRenderedWidth = previewImg.offsetWidth * currentScale;
-        const imgRenderedHeight = previewImg.offsetHeight * currentScale;
-        const containerWidth = cropContainer.clientWidth;
-        const containerHeight = cropContainer.clientHeight;
-
-        // Calculate scale factor between Container and Canvas
-        const scaleX = canvas.width / containerWidth;
-        const scaleY = canvas.height / containerHeight;
-        // We use one scale to maintain aspect ratio, but here we want to map explicitly
-        // We draw the image at the position relative to the canvas 0,0 matched to container 0,0
-        // PosX, PosY is relative to container top-left
-
-        const drawX = posX * scaleX; // Scaled position
-        const drawY = posY * scaleY;
-        const drawW = imgRenderedWidth * scaleX;
-        const drawH = imgRenderedHeight * scaleX; // Assume square pixels
-
-        // Fill background (if image dragged too far)
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        ctx.drawImage(originalImage, drawX, drawY, drawW, drawH);
-
-        finalPhoto = canvas.toDataURL('image/jpeg', 0.85);
-    }
-
-    if (isEdit) {
-        trip.name = name;
-        trip.photo = finalPhoto;
-        Store.save();
-        this.renderTripDetail(tripId);
-    } else {
-        Store.addTrip(name, finalPhoto);
-        this.renderTripList();
-    }
-
-    // Cleanup
-    window.removeEventListener('mousemove', moveDrag);
-    window.removeEventListener('touchmove', moveDrag);
-    window.removeEventListener('mouseup', stopDrag);
-    window.removeEventListener('touchend', stopDrag);
-    modalContainer.innerHTML = '';
-});
+            // Cleanup
+            window.removeEventListener('mousemove', moveDrag);
+            window.removeEventListener('touchmove', moveDrag);
+            window.removeEventListener('mouseup', stopDrag);
+            window.removeEventListener('touchend', stopDrag);
+            modalContainer.innerHTML = '';
+        });
     },
 
-calculateDebtTransfers(balances, members) {
-    // Convert balances to array
-    let debtors = [];
-    let creditors = [];
+    calculateDebtTransfers(balances, members) {
+        // Convert balances to array
+        let debtors = [];
+        let creditors = [];
 
-    for (const [id, amount] of Object.entries(balances)) {
-        // Precision adjustment
-        if (Math.abs(amount) < 0.01) continue;
-        if (amount > 0) creditors.push({ id, amount });
-        if (amount < 0) debtors.push({ id, amount });
-    }
+        for (const [id, amount] of Object.entries(balances)) {
+            // Precision adjustment
+            if (Math.abs(amount) < 0.01) continue;
+            if (amount > 0) creditors.push({ id, amount });
+            if (amount < 0) debtors.push({ id, amount });
+        }
 
-    debtors.sort((a, b) => a.amount - b.amount); // Most negative first
-    creditors.sort((a, b) => b.amount - a.amount); // Most positive first
+        debtors.sort((a, b) => a.amount - b.amount); // Most negative first
+        creditors.sort((a, b) => b.amount - a.amount); // Most positive first
 
-    let html = '';
-    let i = 0; // debtor index
-    let j = 0; // creditor index
+        let html = '';
+        let i = 0; // debtor index
+        let j = 0; // creditor index
 
-    if (debtors.length === 0 && creditors.length === 0) {
-        return `<div style="text-align:center; color:#888;">เคลียร์หมดแล้วจ้า!</div>`;
-    }
+        if (debtors.length === 0 && creditors.length === 0) {
+            return `<div style="text-align:center; color:#888;">เคลียร์หมดแล้วจ้า!</div>`;
+        }
 
-    while (i < debtors.length && j < creditors.length) {
-        let debtor = debtors[i];
-        let creditor = creditors[j];
+        while (i < debtors.length && j < creditors.length) {
+            let debtor = debtors[i];
+            let creditor = creditors[j];
 
-        // The amount to settle is the minimum of what debtor owes and what creditor is owed
-        let amount = Math.min(Math.abs(debtor.amount), creditor.amount);
+            // The amount to settle is the minimum of what debtor owes and what creditor is owed
+            let amount = Math.min(Math.abs(debtor.amount), creditor.amount);
 
-        // Get names
-        let dName = members.find(m => m.id === debtor.id)?.name || 'Unknown';
-        let cName = members.find(m => m.id === creditor.id)?.name || 'Unknown';
+            // Get names
+            let dName = members.find(m => m.id === debtor.id)?.name || 'Unknown';
+            let cName = members.find(m => m.id === creditor.id)?.name || 'Unknown';
 
-        html += `
+            html += `
                 <div style="background: white; padding: 16px; border-radius: 12px; margin-bottom: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: space-between;">
                     <div style="display:flex; align-items:center; gap:8px;">
                          <span style="font-weight:500; color: #F44336;">${dName}</span>
@@ -1922,27 +1907,27 @@ calculateDebtTransfers(balances, members) {
                 </div>
             `;
 
-        // Update remaining amounts
-        debtor.amount += amount;
-        creditor.amount -= amount;
+            // Update remaining amounts
+            debtor.amount += amount;
+            creditor.amount -= amount;
 
-        // Move indices if settled
-        if (Math.abs(debtor.amount) < 0.01) i++;
-        if (creditor.amount < 0.01) j++;
-    }
+            // Move indices if settled
+            if (Math.abs(debtor.amount) < 0.01) i++;
+            if (creditor.amount < 0.01) j++;
+        }
 
-    return html;
-},
+        return html;
+    },
 
-renderTripMembers(memberIds) {
-    if (!memberIds || memberIds.length === 0) {
-        return `<div style="color: #999; font-size: 0.9rem; font-style: italic;">ยังไม่มีสมาชิก</div>`;
-    }
+    renderTripMembers(memberIds) {
+        if (!memberIds || memberIds.length === 0) {
+            return `<div style="color: #999; font-size: 0.9rem; font-style: italic;">ยังไม่มีสมาชิก</div>`;
+        }
 
-    // Resolve member details
-    const members = memberIds.map(id => Store.data.friends.find(f => f.id === id)).filter(Boolean);
+        // Resolve member details
+        const members = memberIds.map(id => Store.data.friends.find(f => f.id === id)).filter(Boolean);
 
-    return members.map(m => `
+        return members.map(m => `
             <div class="member-chip" style="min-width: 60px; display: flex; flex-direction: column; align-items: center; gap: 4px;">
                 <div class="avatar" style="width: 48px; height: 48px; background: #eee; border-radius: 50%; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                     ${m.photo ? `<img src="${m.photo}" style="width:100%; height:100%; object-fit:cover;">` : `<span class="material-icons-round" style="color:#aaa;">person</span>`}
@@ -1950,22 +1935,22 @@ renderTripMembers(memberIds) {
                 <span style="font-size: 0.75rem; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;">${m.name}</span>
             </div>
         `).join('');
-},
+    },
 
-renderExpenseList(expenses) {
-    if (!expenses || expenses.length === 0) {
-        return `
+    renderExpenseList(expenses) {
+        if (!expenses || expenses.length === 0) {
+            return `
                 <div class="empty-state" style="text-align: center; color: #ccc; padding: 20px;">
                     <p>ยังไม่มีรายการค่าใช้จ่าย</p>
                 </div>
             `;
-    }
+        }
 
-    return expenses.map(e => {
-        const payer = Store.data.friends.find(f => f.id === e.payerId);
-        const payerName = payer ? payer.name : 'Unknown';
-        // Note: onclick uses window.ViewManager
-        return `
+        return expenses.map(e => {
+            const payer = Store.data.friends.find(f => f.id === e.payerId);
+            const payerName = payer ? payer.name : 'Unknown';
+            // Note: onclick uses window.ViewManager
+            return `
                 <div onclick="window.ViewManager.renderCardPreview(window.Store.data.trips.find(t => t.id === '${e.tripId}'), window.Store.data.trips.find(t => t.id === '${e.tripId}').expenses.find(x => x.id === '${e.id}'))" 
                      style="background: white; padding: 12px; border-radius: 12px; margin-bottom: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
                     <div>
@@ -1977,27 +1962,27 @@ renderExpenseList(expenses) {
                     </div>
                 </div>
         `;
-    }).join('');
-},
+        }).join('');
+    },
 
-promptAddMemberToTrip(tripId) {
-    try {
-        const friends = Store.data.friends || [];
+    promptAddMemberToTrip(tripId) {
+        try {
+            const friends = Store.data.friends || [];
 
-        // Debug: Check if method exists
-        if (typeof this.renderQuickAddFriendModal !== 'function') {
-            throw new Error('renderQuickAddFriendModal is missing!');
-        }
+            // Debug: Check if method exists
+            if (typeof this.renderQuickAddFriendModal !== 'function') {
+                throw new Error('renderQuickAddFriendModal is missing!');
+            }
 
-        // Render Modal
-        const modalContainer = document.getElementById('modal-container');
-        const trip = Store.data.trips.find(t => t.id === tripId);
-        if (!trip) throw new Error('Trip not found: ' + tripId);
+            // Render Modal
+            const modalContainer = document.getElementById('modal-container');
+            const trip = Store.data.trips.find(t => t.id === tripId);
+            if (!trip) throw new Error('Trip not found: ' + tripId);
 
-        const existingMembers = trip.members || [];
+            const existingMembers = trip.members || [];
 
-        const renderSelectionModal = () => {
-            modalContainer.innerHTML = `
+            const renderSelectionModal = () => {
+                modalContainer.innerHTML = `
                     <div class="modal-overlay" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px;">
                         <div class="modal-card" style="background: white; width: 100%; max-width: 400px; border-radius: 20px; padding: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
@@ -2009,9 +1994,9 @@ promptAddMemberToTrip(tripId) {
                             
                             <div id="friend-select-list" style="max-height: 300px; overflow-y: auto; margin-bottom: 24px;">
                                 ${friends.length === 0 ? `<div style="text-align:center; color:#999; padding:20px;">ยังไม่มีเพื่อนในรายการ</div>` :
-                    friends.map(f => {
-                        const isAdded = existingMembers.includes(f.id);
-                        return `
+                        friends.map(f => {
+                            const isAdded = existingMembers.includes(f.id);
+                            return `
                                         <div class="friend-select-item" data-id="${f.id}" style="display: flex; align-items: center; padding: 8px; border-radius: 12px; margin-bottom: 8px; cursor: pointer; background: ${isAdded ? '#f5f5f5' : 'white'}; border: 2px solid ${isAdded ? 'transparent' : '#eee'}; opacity: ${isAdded ? 0.6 : 1}; pointer-events: ${isAdded ? 'none' : 'auto'};">
                                             <div style="position: relative; margin-right: 12px;">
                                                 <div class="avatar" style="width: 48px; height: 48px; background: #eee; border-radius: 50%; display: flex; align-items: center; justify-content: center; overflow: hidden;">
@@ -2027,7 +2012,7 @@ promptAddMemberToTrip(tripId) {
                                             </div>
                                         </div>
                                     `;
-                    }).join('')}
+                        }).join('')}
                             </div>
 
                             <div style="display: flex; gap: 12px;">
@@ -2038,70 +2023,70 @@ promptAddMemberToTrip(tripId) {
                     </div>
                 `;
 
-            // Re-bind Selection Logic (Same as before)
-            const selectedIds = new Set();
-            modalContainer.querySelectorAll('.friend-select-item').forEach(item => {
-                item.addEventListener('click', () => {
-                    const id = item.dataset.id;
-                    const check = item.querySelector('.check-indicator');
-                    if (selectedIds.has(id)) {
-                        selectedIds.delete(id);
-                        item.style.borderColor = '#eee';
-                        item.style.backgroundColor = 'white';
-                        check.style.display = 'none';
-                    } else {
-                        selectedIds.add(id);
-                        item.style.borderColor = 'var(--primary-color)';
-                        item.style.backgroundColor = 'var(--primary-light-alpha, #f3e5f5)';
-                        check.style.display = 'flex';
-                    }
+                // Re-bind Selection Logic (Same as before)
+                const selectedIds = new Set();
+                modalContainer.querySelectorAll('.friend-select-item').forEach(item => {
+                    item.addEventListener('click', () => {
+                        const id = item.dataset.id;
+                        const check = item.querySelector('.check-indicator');
+                        if (selectedIds.has(id)) {
+                            selectedIds.delete(id);
+                            item.style.borderColor = '#eee';
+                            item.style.backgroundColor = 'white';
+                            check.style.display = 'none';
+                        } else {
+                            selectedIds.add(id);
+                            item.style.borderColor = 'var(--primary-color)';
+                            item.style.backgroundColor = 'var(--primary-light-alpha, #f3e5f5)';
+                            check.style.display = 'flex';
+                        }
+                    });
                 });
-            });
 
-            document.getElementById('btn-cancel-modal').addEventListener('click', () => modalContainer.innerHTML = '');
-            document.getElementById('btn-confirm-modal').addEventListener('click', () => {
-                if (selectedIds.size > 0) {
-                    if (!trip.members) trip.members = [];
-                    selectedIds.forEach(id => trip.members.push(id));
-                    Store.save();
-                    this.renderTripDetail(tripId);
-                }
-                modalContainer.innerHTML = '';
-            });
+                document.getElementById('btn-cancel-modal').addEventListener('click', () => modalContainer.innerHTML = '');
+                document.getElementById('btn-confirm-modal').addEventListener('click', () => {
+                    if (selectedIds.size > 0) {
+                        if (!trip.members) trip.members = [];
+                        selectedIds.forEach(id => trip.members.push(id));
+                        Store.save();
+                        this.renderTripDetail(tripId);
+                    }
+                    modalContainer.innerHTML = '';
+                });
 
-            // New: Quick Create Button
-            document.getElementById('btn-quick-create-friend').addEventListener('click', () => {
+                // New: Quick Create Button
+                document.getElementById('btn-quick-create-friend').addEventListener('click', () => {
+                    this.renderQuickAddFriendModal((newFriendId) => {
+                        trip.members.push(newFriendId);
+                        Store.save();
+                        this.renderTripDetail(tripId);
+                        modalContainer.innerHTML = '';
+                    });
+                });
+            };
+
+            // Initial Trigger
+            if (friends.length === 0) {
                 this.renderQuickAddFriendModal((newFriendId) => {
+                    if (!trip.members) trip.members = [];
                     trip.members.push(newFriendId);
                     Store.save();
                     this.renderTripDetail(tripId);
-                    modalContainer.innerHTML = '';
                 });
-            });
-        };
+            } else {
+                renderSelectionModal();
+            }
 
-        // Initial Trigger
-        if (friends.length === 0) {
-            this.renderQuickAddFriendModal((newFriendId) => {
-                if (!trip.members) trip.members = [];
-                trip.members.push(newFriendId);
-                Store.save();
-                this.renderTripDetail(tripId);
-            });
-        } else {
-            renderSelectionModal();
+        } catch (e) {
+            alert('เกิดข้อผิดพลาด (Debug): ' + e.message + '\n' + e.stack);
+            console.error(e);
         }
+    },
 
-    } catch (e) {
-        alert('เกิดข้อผิดพลาด (Debug): ' + e.message + '\n' + e.stack);
-        console.error(e);
-    }
-},
-
-// New Helper: Quick Add Friend Modal (No Page Navigation)
-renderQuickAddFriendModal(onSuccessCallback) {
-    const modalContainer = document.getElementById('modal-container');
-    modalContainer.innerHTML = `
+    // New Helper: Quick Add Friend Modal (No Page Navigation)
+    renderQuickAddFriendModal(onSuccessCallback) {
+        const modalContainer = document.getElementById('modal-container');
+        modalContainer.innerHTML = `
             <div class="modal-overlay" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1050; display: flex; align-items: center; justify-content: center; padding: 20px;">
                 <div class="modal-card" style="background: white; width: 100%; max-width: 350px; border-radius: 20px; padding: 24px;">
                     <h3 style="margin-bottom: 16px;">เพิ่มเพื่อนใหม่</h3>
@@ -2116,27 +2101,27 @@ renderQuickAddFriendModal(onSuccessCallback) {
             </div>
         `;
 
-    document.getElementById('quick-friend-name').focus();
+        document.getElementById('quick-friend-name').focus();
 
-    document.getElementById('btn-quick-cancel').addEventListener('click', () => {
-        modalContainer.innerHTML = ''; // Close just this modal? Note: If called from selection modal, this wipes it. Acceptable for now.
-    });
+        document.getElementById('btn-quick-cancel').addEventListener('click', () => {
+            modalContainer.innerHTML = ''; // Close just this modal? Note: If called from selection modal, this wipes it. Acceptable for now.
+        });
 
-    document.getElementById('btn-quick-save').addEventListener('click', () => {
-        const name = document.getElementById('quick-friend-name').value.trim();
-        const phone = document.getElementById('quick-friend-phone').value.trim();
+        document.getElementById('btn-quick-save').addEventListener('click', () => {
+            const name = document.getElementById('quick-friend-name').value.trim();
+            const phone = document.getElementById('quick-friend-phone').value.trim();
 
-        if (!name) {
-            alert('กรุณาใส่ชื่อ');
-            return;
-        }
+            if (!name) {
+                alert('กรุณาใส่ชื่อ');
+                return;
+            }
 
-        const newFriend = Store.addFriend(name, phone);
+            const newFriend = Store.addFriend(name, phone);
 
-        if (onSuccessCallback) onSuccessCallback(newFriend.id);
-        modalContainer.innerHTML = '';
-    });
-}
+            if (onSuccessCallback) onSuccessCallback(newFriend.id);
+            modalContainer.innerHTML = '';
+        });
+    }
 };
 
 // Assuming Store is defined elsewhere, we'll add the method to it.
@@ -2453,77 +2438,84 @@ Object.assign(ViewManager, {
             });
         }
 
-        // Update navigateTo to handle 'friends'
-        const originalNavigateTo = ViewManager.navigateTo;
-        ViewManager.navigateTo = function (viewName) {
-            if (viewName === 'friends') {
-                this.renderFriends();
-            } else {
-                originalNavigateTo.call(this, viewName);
-            }
-        };
+        // End Logic: Delete
+    }
+});
 
-        // Initialize App
-        document.addEventListener('DOMContentLoaded', () => {
-            // Explicitly expose globals for inline handlers
-            window.Store = Store;
-            window.ViewManager = ViewManager;
+// --- Global Setup & Overrides ---
 
-            Store.init();
-            ViewManager.init();
-        });
+// Override navigateTo to handle 'friends' view
+const originalNavigateTo = ViewManager.navigateTo;
+ViewManager.navigateTo = function (viewName) {
+    if (viewName === 'friends') {
+        this.renderFriends();
+    } else {
+        originalNavigateTo.call(this, viewName);
+    }
+};
 
-        // --- Swipe Logic (Global) ---
-        let touchStartX = 0;
-        let touchCurrentX = 0;
-        let activeSwipeEl = null;
+// Initialize App
+document.addEventListener('DOMContentLoaded', () => {
+    // Explicitly expose globals for inline handlers
+    window.Store = Store;
+    window.ViewManager = ViewManager;
 
-        window.handleSwipeStart = (e) => {
-            // Support Mouse or Touch
-            const isTouch = e.type === 'touchstart';
-            touchStartX = isTouch ? e.touches[0].clientX : e.clientX;
+    Store.init();
+    ViewManager.init();
+});
 
-            activeSwipeEl = e.currentTarget;
-            activeSwipeEl.style.transition = 'none'; // Follow finger instantly
-        };
+// --- Swipe Logic (Global) ---
+let touchStartX = 0;
+let touchCurrentX = 0;
+let activeSwipeEl = null;
 
-        window.handleSwipeMove = (e) => {
-            if (!activeSwipeEl) return;
+window.handleSwipeStart = (e) => {
+    // Support Mouse or Touch
+    const isTouch = e.type === 'touchstart';
+    touchStartX = isTouch ? e.touches[0].clientX : e.clientX;
+    touchCurrentX = touchStartX; // Fix: Initialize to prevent false diff on tap
 
-            const isTouch = e.type === 'touchmove';
-            // Safety check for mouse vs touch
-            if (isTouch && (!e.touches || e.touches.length === 0)) return;
+    activeSwipeEl = e.currentTarget;
+    activeSwipeEl.style.transition = 'none'; // Follow finger instantly
+};
 
-            touchCurrentX = isTouch ? e.touches[0].clientX : e.clientX;
-            const diff = touchCurrentX - touchStartX;
+window.handleSwipeMove = (e) => {
+    if (!activeSwipeEl) return;
 
-            // Only allow left swipe (negative diff)
-            if (diff < 0) {
-                // Limit drag to -80px (button width) with some resistance
-                const translate = Math.max(diff, -100);
-                activeSwipeEl.style.transform = `translateX(${translate}px)`;
-            } else {
-                // Reset if dragging right
-                activeSwipeEl.style.transform = `translateX(0px)`;
-            }
-        };
+    const isTouch = e.type === 'touchmove';
+    // Safety check for mouse vs touch
+    if (isTouch && (!e.touches || e.touches.length === 0)) return;
 
-        window.handleSwipeEnd = (e) => {
-            if (!activeSwipeEl) return;
-            activeSwipeEl.style.transition = 'transform 0.2s ease-out';
-            const diff = touchCurrentX - touchStartX;
+    touchCurrentX = isTouch ? e.touches[0].clientX : e.clientX;
+    const diff = touchCurrentX - touchStartX;
 
-            // Threshold to snap open (e.g. -40px)
-            if (diff < -40) {
-                activeSwipeEl.style.transform = `translateX(-80px)`;
-                activeSwipeEl.classList.add('swiped');
-            } else {
-                activeSwipeEl.style.transform = `translateX(0px)`;
-                activeSwipeEl.classList.remove('swiped');
-            }
+    // Only allow left swipe (negative diff)
+    if (diff < 0) {
+        // Limit drag to -80px (button width) with some resistance
+        const translate = Math.max(diff, -100);
+        activeSwipeEl.style.transform = `translateX(${translate}px)`;
+    } else {
+        // Reset if dragging right
+        activeSwipeEl.style.transform = `translateX(0px)`;
+    }
+};
 
-            // Reset global vars
-            touchStartX = 0;
-            touchCurrentX = 0;
-            activeSwipeEl = null;
-        };
+window.handleSwipeEnd = (e) => {
+    if (!activeSwipeEl) return;
+    activeSwipeEl.style.transition = 'transform 0.2s ease-out';
+    const diff = touchCurrentX - touchStartX;
+
+    // Threshold to snap open (e.g. -40px)
+    if (diff < -40) {
+        activeSwipeEl.style.transform = `translateX(-80px)`;
+        activeSwipeEl.classList.add('swiped');
+    } else {
+        activeSwipeEl.style.transform = `translateX(0px)`;
+        activeSwipeEl.classList.remove('swiped');
+    }
+
+    // Reset global vars
+    touchStartX = 0;
+    touchCurrentX = 0;
+    activeSwipeEl = null;
+};
