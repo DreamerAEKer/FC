@@ -774,17 +774,56 @@ const ViewManager = {
         });
 
         // Listeners
+        // Listeners for Card Preview
         document.getElementById('btn-cancel-card').addEventListener('click', () => {
-            this.renderTripDetail(trip.id);
+            try {
+                this.renderTripDetail(trip.id);
+            } catch (e) {
+                alert('Back Error: ' + e.message);
+            }
         });
 
         document.getElementById('btn-save-card').addEventListener('click', () => {
+            const btnSave = document.getElementById('btn-save-card');
+            const originalText = btnSave.innerText;
+            btnSave.innerText = 'กำลังสร้างรูป...';
+            btnSave.disabled = true;
+
             const card = document.getElementById('expense-card');
-            html2canvas(card, { scale: 3 }).then(canvas => {
-                const link = document.createElement('a');
-                link.download = `Saduak-${expense.title}.png`;
-                link.href = canvas.toDataURL();
-                link.click();
+
+            // Use html2canvas with specific settings for mobile
+            html2canvas(card, {
+                scale: 3,
+                useCORS: true,
+                backgroundColor: null,
+                logging: false
+            }).then(canvas => {
+                const imgData = canvas.toDataURL('image/png');
+
+                // On Mobile: Show image in modal to Long-Press (Download often fails)
+                const modalContainer = document.getElementById('modal-container');
+                modalContainer.innerHTML = `
+                    <div class="modal-overlay" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 2000; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px;">
+                        <h3 style="color: white; margin-bottom: 16px; font-weight: 300;">แตะค้างที่รูปเพื่อบันทึก</h3>
+                        <img src="${imgData}" style="max-width: 100%; max-height: 70vh; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); margin-bottom: 24px;">
+                        <button id="btn-close-preview" class="btn" style="background: white; padding: 12px 24px; border-radius: 30px; min-width: 120px; justify-content: center; font-weight: 600;">
+                            ปิด
+                        </button>
+                    </div>
+                `;
+
+                document.getElementById('btn-close-preview').addEventListener('click', () => {
+                    modalContainer.innerHTML = '';
+                });
+
+                // Reset Button
+                btnSave.innerText = originalText;
+                btnSave.disabled = false;
+
+            }).catch(err => {
+                alert('เกิดข้อผิดพลาดในการสร้างรูป: ' + err.message);
+                btnSave.innerText = originalText;
+                btnSave.disabled = false;
             });
         });
     },
