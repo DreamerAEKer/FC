@@ -1574,14 +1574,22 @@ const ViewManager = {
  */
 Object.assign(ViewManager, {
     renderFriends() {
+        // Toggle state for reordering
+        if (typeof this.isReordering === 'undefined') this.isReordering = false;
+
         const mainContent = document.getElementById('main-content');
         mainContent.innerHTML = `
             <div id="friends-view" class="view active">
                 <div class="section-title" style="display:flex; justify-content:space-between; align-items:center;">
                     <h3>เพื่อนทั้งหมด</h3>
-                    <button id="btn-add-friend" class="btn btn-primary" style="padding: 8px 16px; font-size: 0.9rem;">
-                        <span class="material-icons-round">person_add</span> เพิ่มเพื่อน
-                    </button>
+                    <div style="display:flex; gap:8px;">
+                         <button id="btn-reorder-friend" class="btn" style="padding: 8px 12px; font-size: 0.9rem; background: ${this.isReordering ? '#ffecb3' : '#f5f5f5'}; color: ${this.isReordering ? '#f57f17' : '#666'};">
+                            <span class="material-icons-round">sort</span> ${this.isReordering ? 'เสร็จสิ้น' : 'จัดลำดับ'}
+                        </button>
+                        <button id="btn-add-friend" class="btn btn-primary" style="padding: 8px 16px; font-size: 0.9rem;">
+                            <span class="material-icons-round">person_add</span> เพิ่มเพื่อน
+                        </button>
+                    </div>
                 </div>
                 <div id="friend-list" class="friend-list">
                     <!-- Friends will be listed here -->
@@ -1591,6 +1599,11 @@ Object.assign(ViewManager, {
 
         document.getElementById('btn-add-friend').addEventListener('click', () => {
             this.renderAddEditFriend(); // No ID = Add New
+        });
+
+        document.getElementById('btn-reorder-friend').addEventListener('click', () => {
+            this.isReordering = !this.isReordering;
+            this.renderFriends(); // Re-render whole view to update button state
         });
 
         this.renderFriendList();
@@ -1610,7 +1623,7 @@ Object.assign(ViewManager, {
             return;
         }
 
-        listContainer.innerHTML = friends.map(friend => `
+        listContainer.innerHTML = friends.map((friend, index) => `
             <div class="friend-card" style="background: white; padding: 12px; border-radius: 12px; margin-bottom: 8px; display: flex; align-items: center; gap: 12px; justify-content: space-between;">
                 <div style="display:flex; align-items:center; gap: 12px; flex:1;">
                     <div class="avatar" style="width: 48px; height: 48px; min-width: 48px; background: #eee; border-radius: 50%; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 1px solid #ddd;">
@@ -1621,11 +1634,50 @@ Object.assign(ViewManager, {
                         <span style="font-size: 0.8rem; color: #888;">${friend.phone || 'ไม่ระบุเบอร์'}</span>
                     </div>
                 </div>
-                <button class="btn" onclick="window.ViewManager.renderAddEditFriend('${friend.id}')" style="background: #f5f5f5; width:36px; height:36px; padding:0; justify-content:center; border-radius:50%; color:#666;">
-                     <span class="material-icons-round" style="font-size: 18px;">edit</span>
-                </button>
+                
+                ${this.isReordering ? `
+                    <div style="display:flex; flex-direction:column; gap:4px;">
+                        <button class="btn-move-up" data-index="${index}" style="background:none; border:none; padding:4px; color:${index === 0 ? '#eee' : '#666'};" ${index === 0 ? 'disabled' : ''}>
+                            <span class="material-icons-round">keyboard_arrow_up</span>
+                        </button>
+                        <button class="btn-move-down" data-index="${index}" style="background:none; border:none; padding:4px; color:${index === friends.length - 1 ? '#eee' : '#666'};" ${index === friends.length - 1 ? 'disabled' : ''}>
+                            <span class="material-icons-round">keyboard_arrow_down</span>
+                        </button>
+                    </div>
+                ` : `
+                    <button class="btn" onclick="window.ViewManager.renderAddEditFriend('${friend.id}')" style="background: #f5f5f5; width:36px; height:36px; padding:0; justify-content:center; border-radius:50%; color:#666;">
+                         <span class="material-icons-round" style="font-size: 18px;">edit</span>
+                    </button>
+                `}
             </div>
         `).join('');
+
+        // Reordering Event Listeners
+        if (this.isReordering) {
+            listContainer.querySelectorAll('.btn-move-up').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const idx = parseInt(e.currentTarget.dataset.index);
+                    if (idx > 0) {
+                        // Swap with previous
+                        [friends[idx], friends[idx - 1]] = [friends[idx - 1], friends[idx]];
+                        Store.save();
+                        this.renderFriendList();
+                    }
+                });
+            });
+
+            listContainer.querySelectorAll('.btn-move-down').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const idx = parseInt(e.currentTarget.dataset.index);
+                    if (idx < friends.length - 1) {
+                        // Swap with next
+                        [friends[idx], friends[idx + 1]] = [friends[idx + 1], friends[idx]];
+                        Store.save();
+                        this.renderFriendList();
+                    }
+                });
+            });
+        }
     },
 
     renderAddEditFriend(friendId = null) {
