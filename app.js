@@ -40,10 +40,11 @@ const Store = {
         ];
     },
 
-    addTrip(name) {
+    addTrip(name, photo = null) {
         const newTrip = {
             id: 't' + Date.now() + Math.random().toString(36).substr(2, 5), // Enhanced uniqueness
             name: name,
+            photo: photo,
             date: new Date().toISOString(),
             status: 'active',
             members: [],
@@ -330,11 +331,7 @@ const ViewManager = {
     },
 
     createNewTrip() {
-        const name = prompt('ชื่อทริปของคุณ (เช่น เที่ยวเชียงใหม่):');
-        if (name) {
-            Store.addTrip(name);
-            this.renderTripList();
-        }
+        this.renderCreateEditTripModal();
     },
 
     openTrip(tripId) {
@@ -363,15 +360,20 @@ const ViewManager = {
                         <span class="material-icons-round">ios_share</span>
                     </button>
 
-                    <div id="trip-title-container" style="display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; padding: 8px; border-radius: 8px; transition: background 0.2s;" 
-                         ontouchstart="this.style.background='rgba(0,0,0,0.05)'" 
-                         ontouchend="this.style.background='transparent'"
-                         onmousedown="this.style.background='rgba(0,0,0,0.05)'" 
-                         onmouseup="this.style.background='transparent'">
-                        <h2 style="border-bottom: 1px dotted rgba(0,0,0,0.2); display: inline-block; margin: 0;">${trip.name}</h2>
-                        <span class="material-icons-round" style="font-size: 18px; color: var(--primary-color);">edit</span>
+                    <div id="trip-title-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; cursor: pointer; padding: 16px; border-radius: 16px; transition: background 0.2s; position: relative; overflow: hidden; color: ${trip.photo ? 'white' : 'inherit'}; text-shadow: ${trip.photo ? '0 2px 4px rgba(0,0,0,0.5)' : 'none'};" 
+                         ontouchstart="this.style.transform='scale(0.98)'" 
+                         ontouchend="this.style.transform='scale(1)'"
+                         onmousedown="this.style.transform='scale(0.98)'" 
+                         onmouseup="this.style.transform='scale(1)'">
+                        
+                        ${trip.photo ? `<div style="position: absolute; top:0; left:0; right:0; bottom:0; background: url('${trip.photo}') center/cover no-repeat; z-index: 0; filter: brightness(0.7);"></div>` : ''}
+                        
+                        <div style="position: relative; z-index: 1; display:flex; align-items:center; gap:8px;">
+                            <h2 style="display: inline-block; margin: 0;">${trip.name}</h2>
+                            <span class="material-icons-round" style="font-size: 18px; color: ${trip.photo ? 'white' : 'var(--primary-color)'};">edit</span>
+                        </div>
+                        <p style="color: ${trip.photo ? 'rgba(255,255,255,0.9)' : '#666'}; margin-top: 4px; position:relative; z-index:1;">${new Date(trip.date).toLocaleDateString('th-TH')}</p>
                     </div>
-                    <p style="color: #666; margin-top: 4px;">${new Date(trip.date).toLocaleDateString('th-TH')}</p>
                     
                     <div class="expense-summary" style="margin-top: 16px; background: var(--primary-gradient); color: white; padding: 24px; border-radius: 20px; box-shadow: var(--shadow-md);">
                         <p style="opacity: 0.9; font-size: 0.9rem;">ยอดรวมทั้งหมด</p>
@@ -414,16 +416,11 @@ const ViewManager = {
             this.renderHome();
         });
 
-        // Edit Trip Name (Target the whole container for better mobile touch area)
+        // Edit Trip Name & Photo
         const tripTitleContainer = document.getElementById('trip-title-container');
         if (tripTitleContainer) {
             tripTitleContainer.addEventListener('click', () => {
-                const newName = prompt('แก้ไขชื่อทริป:', trip.name);
-                if (newName && newName.trim()) {
-                    trip.name = newName.trim();
-                    Store.save();
-                    this.renderTripDetail(tripId);
-                }
+                this.renderCreateEditTripModal(tripId);
             });
         }
 
@@ -1019,6 +1016,143 @@ const ViewManager = {
 
         document.getElementById('btn-back-trip-settle').addEventListener('click', () => {
             this.renderTripDetail(tripId);
+        });
+    },
+
+    /**
+     * Create / Edit Trip Modal with Voice & Image
+     */
+    renderCreateEditTripModal(tripId = null) {
+        const isEdit = !!tripId;
+        const trip = isEdit ? Store.data.trips.find(t => t.id === tripId) : { name: '', photo: null };
+
+        const modalContainer = document.getElementById('modal-container');
+        modalContainer.innerHTML = `
+            <div class="modal-overlay" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1050; display: flex; align-items: center; justify-content: center; padding: 20px;">
+                <div class="modal-card" style="background: white; width: 100%; max-width: 350px; border-radius: 20px; padding: 24px;">
+                    <h3 style="margin-bottom: 20px;">${isEdit ? 'แก้ไขทริป' : 'สร้างทริปใหม่'}</h3>
+                    
+                    <!-- Cover Photo Upload -->
+                    <div style="display:flex; flex-direction:column; align-items:center; margin-bottom: 20px;">
+                        <div style="position: relative; width: 100%; height: 140px; border-radius: 12px; overflow: hidden; background: #f5f5f5; border: 2px dashed #ddd; display: flex; align-items: center; justify-content: center;">
+                            <div id="preview-trip-cover" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
+                                ${trip.photo ? `<img src="${trip.photo}" style="width:100%; height:100%; object-fit:cover;">` : `<span style="color:#aaa; font-size:0.9rem;">+ เพิ่มรูปปก</span>`}
+                            </div>
+                            <input type="file" id="inp-trip-photo" accept="image/*" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
+                        </div>
+                    </div>
+
+                    <!-- Name Input with Voice -->
+                    <div class="input-group" style="margin-bottom: 24px;">
+                        <label style="display:block; margin-bottom:8px; font-weight:500;">ชื่อทริป</label>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="text" id="inp-trip-name" value="${trip.name}" placeholder="เช่น เที่ยวเชียงใหม่" style="flex:1; padding: 12px; border: 1px solid #ddd; border-radius: 8px;" required>
+                            <button type="button" id="btn-voice-trip" class="btn" style="background:#eee; padding: 8px 12px; width:44px; justify-content:center;">
+                                <span class="material-icons-round">mic</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; gap: 12px;">
+                        <button id="btn-cancel-trip-modal" class="btn" style="flex: 1; background: #f5f5f5; color: #666; justify-content: center;">ยกเลิก</button>
+                        <button id="btn-save-trip-modal" class="btn btn-primary" style="flex: 1; justify-content: center;">${isEdit ? 'บันทึก' : 'สร้างเลย'}</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('inp-trip-name').focus();
+
+        // Helper functions from local scope (or reused)
+        const photoInput = document.getElementById('inp-trip-photo');
+        const previewCover = document.getElementById('preview-trip-cover');
+        let currentPhotoBase64 = trip.photo;
+
+        // Image Logic
+        photoInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    // Resize Logic (Max 800x600 for covers)
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    const MAX_WIDTH = 800;
+                    const MAX_HEIGHT = 600;
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > MAX_WIDTH) {
+                            height *= MAX_WIDTH / width;
+                            width = MAX_WIDTH;
+                        }
+                    } else {
+                        if (height > MAX_HEIGHT) {
+                            width *= MAX_HEIGHT / height;
+                            height = MAX_HEIGHT;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    ctx.drawImage(img, 0, 0, width, height);
+                    currentPhotoBase64 = canvas.toDataURL('image/jpeg', 0.8);
+                    previewCover.innerHTML = `<img src="${currentPhotoBase64}" style="width:100%; height:100%; object-fit:cover;">`;
+                    previewCover.parentElement.style.border = 'none'; // remove dashed
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+
+        // Voice Logic
+        document.getElementById('btn-voice-trip').addEventListener('click', () => {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) return alert('ใช้ Voice ไม่ได้ในเบราว์เซอร์นี้');
+
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'th-TH';
+            const btn = document.getElementById('btn-voice-trip');
+            btn.style.background = '#ff5252';
+            btn.style.color = 'white';
+
+            recognition.start();
+
+            recognition.onresult = (e) => {
+                const text = e.results[0][0].transcript;
+                document.getElementById('inp-trip-name').value = text;
+            };
+            recognition.onspeechend = () => {
+                recognition.stop();
+                btn.style.background = '#eee';
+                btn.style.color = 'black';
+            };
+            recognition.onerror = () => {
+                btn.style.background = '#eee';
+                btn.style.color = 'black';
+            };
+        });
+
+        document.getElementById('btn-cancel-trip-modal').addEventListener('click', () => modalContainer.innerHTML = '');
+
+        document.getElementById('btn-save-trip-modal').addEventListener('click', () => {
+            const name = document.getElementById('inp-trip-name').value.trim();
+            if (!name) return alert('กรุณาใส่ชื่อทริป');
+
+            if (isEdit) {
+                trip.name = name;
+                trip.photo = currentPhotoBase64;
+                Store.save();
+                this.renderTripDetail(tripId);
+            } else {
+                Store.addTrip(name, currentPhotoBase64);
+                this.renderTripList();
+            }
+            modalContainer.innerHTML = '';
         });
     },
 
