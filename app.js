@@ -1078,111 +1078,120 @@ const ViewManager = {
     },
 
     promptAddMemberToTrip(tripId) {
-        const friends = Store.data.friends;
+        try {
+            const friends = Store.data.friends || [];
 
+            // Debug: Check if method exists
+            if (typeof this.renderQuickAddFriendModal !== 'function') {
+                throw new Error('renderQuickAddFriendModal is missing!');
+            }
 
-        // Render Modal
-        const modalContainer = document.getElementById('modal-container');
-        const trip = Store.data.trips.find(t => t.id === tripId);
-        const existingMembers = trip.members || [];
+            // Render Modal
+            const modalContainer = document.getElementById('modal-container');
+            const trip = Store.data.trips.find(t => t.id === tripId);
+            if (!trip) throw new Error('Trip not found: ' + tripId);
 
-        const renderSelectionModal = () => {
-            modalContainer.innerHTML = `
-                <div class="modal-overlay" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px;">
-                    <div class="modal-card" style="background: white; width: 100%; max-width: 400px; border-radius: 20px; padding: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
-                             <h3 style="font-size: 1.2rem; margin:0;">เลือกเพื่อนเข้าทริป</h3>
-                             <button id="btn-quick-create-friend" style="background: var(--primary-light-alpha, #f3e5f5); color: var(--primary-color); border:none; padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: 600;">
-                                + คนใหม่
-                             </button>
-                        </div>
-                        
-                        <div id="friend-select-list" style="max-height: 300px; overflow-y: auto; margin-bottom: 24px;">
-                            ${friends.length === 0 ? `<div style="text-align:center; color:#999; padding:20px;">ยังไม่มีเพื่อนในรายการ</div>` :
-                    friends.map(f => {
-                        const isAdded = existingMembers.includes(f.id);
-                        return `
-                                    <div class="friend-select-item" data-id="${f.id}" style="display: flex; align-items: center; padding: 8px; border-radius: 12px; margin-bottom: 8px; cursor: pointer; background: ${isAdded ? '#f5f5f5' : 'white'}; border: 2px solid ${isAdded ? 'transparent' : '#eee'}; opacity: ${isAdded ? 0.6 : 1}; pointer-events: ${isAdded ? 'none' : 'auto'};">
-                                        <div style="position: relative; margin-right: 12px;">
-                                            <div class="avatar" style="width: 48px; height: 48px; background: #eee; border-radius: 50%; display: flex; align-items: center; justify-content: center; overflow: hidden;">
-                                                ${f.photo ? `<img src="${f.photo}" style="width:100%; height:100%; object-fit:cover;">` : `<span class="material-icons-round" style="color:#aaa;">person</span>`}
+            const existingMembers = trip.members || [];
+
+            const renderSelectionModal = () => {
+                modalContainer.innerHTML = `
+                    <div class="modal-overlay" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px;">
+                        <div class="modal-card" style="background: white; width: 100%; max-width: 400px; border-radius: 20px; padding: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
+                                 <h3 style="font-size: 1.2rem; margin:0;">เลือกเพื่อนเข้าทริป</h3>
+                                 <button id="btn-quick-create-friend" style="background: var(--primary-light-alpha, #f3e5f5); color: var(--primary-color); border:none; padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: 600;">
+                                    + คนใหม่
+                                 </button>
+                            </div>
+                            
+                            <div id="friend-select-list" style="max-height: 300px; overflow-y: auto; margin-bottom: 24px;">
+                                ${friends.length === 0 ? `<div style="text-align:center; color:#999; padding:20px;">ยังไม่มีเพื่อนในรายการ</div>` :
+                        friends.map(f => {
+                            const isAdded = existingMembers.includes(f.id);
+                            return `
+                                        <div class="friend-select-item" data-id="${f.id}" style="display: flex; align-items: center; padding: 8px; border-radius: 12px; margin-bottom: 8px; cursor: pointer; background: ${isAdded ? '#f5f5f5' : 'white'}; border: 2px solid ${isAdded ? 'transparent' : '#eee'}; opacity: ${isAdded ? 0.6 : 1}; pointer-events: ${isAdded ? 'none' : 'auto'};">
+                                            <div style="position: relative; margin-right: 12px;">
+                                                <div class="avatar" style="width: 48px; height: 48px; background: #eee; border-radius: 50%; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                                                    ${f.photo ? `<img src="${f.photo}" style="width:100%; height:100%; object-fit:cover;">` : `<span class="material-icons-round" style="color:#aaa;">person</span>`}
+                                                </div>
+                                                <div class="check-indicator" style="position: absolute; bottom: 0; right: 0; background: var(--primary-color); color: white; border-radius: 50%; width: 20px; height: 20px; display: none; align-items: center; justify-content: center; border: 2px solid white;">
+                                                    <span class="material-icons-round" style="font-size: 14px;">check</span>
+                                                </div>
                                             </div>
-                                            <div class="check-indicator" style="position: absolute; bottom: 0; right: 0; background: var(--primary-color); color: white; border-radius: 50%; width: 20px; height: 20px; display: none; align-items: center; justify-content: center; border: 2px solid white;">
-                                                <span class="material-icons-round" style="font-size: 14px;">check</span>
+                                            <div style="flex: 1;">
+                                                <div style="font-weight: 500;">${f.name}</div>
+                                                ${isAdded ? '<span style="font-size: 0.75rem; color: #888;">อยู่ในทริปแล้ว</span>' : ''}
                                             </div>
                                         </div>
-                                        <div style="flex: 1;">
-                                            <div style="font-weight: 500;">${f.name}</div>
-                                            ${isAdded ? '<span style="font-size: 0.75rem; color: #888;">อยู่ในทริปแล้ว</span>' : ''}
-                                        </div>
-                                    </div>
-                                `;
-                    }).join('')}
-                        </div>
+                                    `;
+                        }).join('')}
+                            </div>
 
-                        <div style="display: flex; gap: 12px;">
-                            <button id="btn-cancel-modal" class="btn" style="flex: 1; background: #f5f5f5; color: #666; justify-content: center;">ยกเลิก</button>
-                            <button id="btn-confirm-modal" class="btn btn-primary" style="flex: 1; justify-content: center;">เพิ่มเพื่อนที่เลือก</button>
+                            <div style="display: flex; gap: 12px;">
+                                <button id="btn-cancel-modal" class="btn" style="flex: 1; background: #f5f5f5; color: #666; justify-content: center;">ยกเลิก</button>
+                                <button id="btn-confirm-modal" class="btn btn-primary" style="flex: 1; justify-content: center;">เพิ่มเพื่อนที่เลือก</button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            `;
+                `;
 
-            // Re-bind Selection Logic (Same as before)
-            const selectedIds = new Set();
-            modalContainer.querySelectorAll('.friend-select-item').forEach(item => {
-                item.addEventListener('click', () => {
-                    const id = item.dataset.id;
-                    const check = item.querySelector('.check-indicator');
-                    if (selectedIds.has(id)) {
-                        selectedIds.delete(id);
-                        item.style.borderColor = '#eee';
-                        item.style.backgroundColor = 'white';
-                        check.style.display = 'none';
-                    } else {
-                        selectedIds.add(id);
-                        item.style.borderColor = 'var(--primary-color)';
-                        item.style.backgroundColor = 'var(--primary-light-alpha, #f3e5f5)';
-                        check.style.display = 'flex';
-                    }
+                // Re-bind Selection Logic (Same as before)
+                const selectedIds = new Set();
+                modalContainer.querySelectorAll('.friend-select-item').forEach(item => {
+                    item.addEventListener('click', () => {
+                        const id = item.dataset.id;
+                        const check = item.querySelector('.check-indicator');
+                        if (selectedIds.has(id)) {
+                            selectedIds.delete(id);
+                            item.style.borderColor = '#eee';
+                            item.style.backgroundColor = 'white';
+                            check.style.display = 'none';
+                        } else {
+                            selectedIds.add(id);
+                            item.style.borderColor = 'var(--primary-color)';
+                            item.style.backgroundColor = 'var(--primary-light-alpha, #f3e5f5)';
+                            check.style.display = 'flex';
+                        }
+                    });
                 });
-            });
 
-            document.getElementById('btn-cancel-modal').addEventListener('click', () => modalContainer.innerHTML = '');
-            document.getElementById('btn-confirm-modal').addEventListener('click', () => {
-                if (selectedIds.size > 0) {
-                    if (!trip.members) trip.members = [];
-                    selectedIds.forEach(id => trip.members.push(id));
-                    Store.save();
-                    this.renderTripDetail(tripId);
-                }
-                modalContainer.innerHTML = '';
-            });
+                document.getElementById('btn-cancel-modal').addEventListener('click', () => modalContainer.innerHTML = '');
+                document.getElementById('btn-confirm-modal').addEventListener('click', () => {
+                    if (selectedIds.size > 0) {
+                        if (!trip.members) trip.members = [];
+                        selectedIds.forEach(id => trip.members.push(id));
+                        Store.save();
+                        this.renderTripDetail(tripId);
+                    }
+                    modalContainer.innerHTML = '';
+                });
 
-            // New: Quick Create Button
-            document.getElementById('btn-quick-create-friend').addEventListener('click', () => {
+                // New: Quick Create Button
+                document.getElementById('btn-quick-create-friend').addEventListener('click', () => {
+                    this.renderQuickAddFriendModal((newFriendId) => {
+                        trip.members.push(newFriendId);
+                        Store.save();
+                        this.renderTripDetail(tripId);
+                        modalContainer.innerHTML = '';
+                    });
+                });
+            };
+
+            // Initial Trigger
+            if (friends.length === 0) {
                 this.renderQuickAddFriendModal((newFriendId) => {
-                    // Start fresh flow or just auto-add? 
-                    // Let's just Add to Trip immediately for convenience
+                    if (!trip.members) trip.members = [];
                     trip.members.push(newFriendId);
                     Store.save();
                     this.renderTripDetail(tripId);
-                    modalContainer.innerHTML = ''; // Close all
                 });
-            });
-        };
+            } else {
+                renderSelectionModal();
+            }
 
-        // Initial Trigger
-        if (friends.length === 0) {
-            // Directly open Quick Add Mode if no friends
-            this.renderQuickAddFriendModal((newFriendId) => {
-                if (!trip.members) trip.members = [];
-                trip.members.push(newFriendId);
-                Store.save();
-                this.renderTripDetail(tripId);
-            });
-        } else {
-            renderSelectionModal();
+        } catch (e) {
+            alert('เกิดข้อผิดพลาด (Debug): ' + e.message + '\n' + e.stack);
+            console.error(e);
         }
     },
 
