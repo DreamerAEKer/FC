@@ -559,10 +559,7 @@ const ViewManager = {
                                     <span>${m.name}</span>
                                 </label>
                             `).join('')}
-                        </div>
-                    </div>
-
-                    <button type="button" id="btn-submit-expense" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 16px; margin-bottom: 80px; box-shadow: 0 4px 15px rgba(98, 0, 238, 0.4); position: relative; z-index: 105;">
+                    <button type="button" onclick="ViewManager.submitExpenseWrapper('${tripId}')" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 16px; margin-bottom: 80px; box-shadow: 0 4px 15px rgba(98, 0, 238, 0.4); position: relative; z-index: 105;">
                         บันทึกรายการ
                     </button>
                 </form>
@@ -612,32 +609,6 @@ const ViewManager = {
         // Listeners
         document.getElementById('btn-back-trip').addEventListener('click', () => {
             this.renderTripDetail(tripId);
-        });
-
-        // FIX: Use Click Listener manually to ensure it fires even if form validation is silent
-        document.getElementById('btn-submit-expense').addEventListener('click', (e) => {
-            e.preventDefault();
-            console.log("Button Clicked Manually");
-
-            // Manual Validation Report
-            const amountVal = document.getElementById('inp-amount').value;
-            const titleVal = document.getElementById('inp-title').value;
-
-            if (!amountVal) {
-                alert('กรุณากรอกจำนวนเงิน');
-                return;
-            }
-            if (!titleVal) {
-                alert('กรุณากรอกชื่อรายการ');
-                return;
-            }
-
-            try {
-                this.submitExpense(tripId);
-            } catch (err) {
-                alert('Error submitting: ' + err.message);
-                console.error(err);
-            }
         });
 
         // Voice Recognition (Web Speech API)
@@ -908,6 +879,29 @@ const ViewManager = {
         }
 
         return { amount, title };
+    },
+
+    submitExpenseWrapper(tripId) {
+        console.log("Wrapper Clicked for Trip:", tripId);
+
+        const amountVal = document.getElementById('inp-amount').value;
+        const titleVal = document.getElementById('inp-title').value;
+
+        if (!amountVal) {
+            alert('กรุณากรอกจำนวนเงิน');
+            return;
+        }
+        if (!titleVal) {
+            alert('กรุณากรอกชื่อรายการ');
+            return;
+        }
+
+        try {
+            this.submitExpense(tripId);
+        } catch (err) {
+            alert('พบข้อผิดพลาด: ' + err.message);
+            console.error(err);
+        }
     },
 
     submitExpense(tripId) {
