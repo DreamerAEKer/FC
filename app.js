@@ -454,10 +454,20 @@ const ViewManager = {
         });
 
         document.getElementById('btn-add-expense').addEventListener('click', () => {
+            if (!trip.members || trip.members.length === 0) {
+                alert('ต้องมีสมาชิกในทริปก่อนจดค่าใช้จ่ายครับ\nโปรดเพิ่มเพื่อนเข้าทริปก่อนนะครับ');
+                this.promptAddMemberToTrip(tripId);
+                return;
+            }
             this.renderAddExpense(tripId);
         });
 
         document.getElementById('btn-settle').addEventListener('click', () => {
+            if (!trip.members || trip.members.length === 0) {
+                alert('ต้องมีสมาชิกในทริปก่อนครับ\nโปรดเพิ่มเพื่อนเข้าทริปก่อนนะครับ');
+                this.promptAddMemberToTrip(tripId);
+                return;
+            }
             this.renderSettlement(tripId);
         });
     },
@@ -1317,9 +1327,6 @@ const ViewManager = {
                 const scaleX = canvas.width / containerWidth;
                 const scaleY = canvas.height / containerHeight;
                 // We use one scale to maintain aspect ratio, but here we want to map explicitly
-                // Actually safer to crop based on visual percentage
-
-                // Draw logic:
                 // We draw the image at the position relative to the canvas 0,0 matched to container 0,0
                 // PosX, PosY is relative to container top-left
 
