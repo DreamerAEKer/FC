@@ -1687,7 +1687,7 @@ Object.assign(ViewManager, {
         const mainContent = document.getElementById('main-content');
         mainContent.innerHTML = `
             <div id="add-friend-view" class="view active">
-                <div class="trip-header text-center" style="margin-bottom: 24px;">
+                <div class="trip-header text-center" style="position: relative; margin-bottom: 24px;">
                     <button class="btn" id="btn-back-friends" style="position: absolute; left: 16px; top: 16px; padding: 8px; width: 40px; height: 40px; justify-content: center; background: white; box-shadow: var(--shadow-sm);">
                         <span class="material-icons-round">arrow_back</span>
                     </button>
