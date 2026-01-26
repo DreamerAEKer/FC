@@ -1098,32 +1098,47 @@ const ViewManager = {
         }
 
         function fitImageToContainer() {
-            const containerRatio = cropContainer.clientWidth / cropContainer.clientHeight;
+            const containerW = cropContainer.clientWidth;
+            const containerH = cropContainer.clientHeight;
+            const containerRatio = containerW / containerH;
             const imgRatio = originalImage.width / originalImage.height;
 
             // Standard "cover" fit initial
+            let finalW, finalH;
+
             if (imgRatio > containerRatio) {
+                // Image is wider than container: constrained by height
+                // height = 100% (containerH)
                 previewImg.style.height = '100%';
                 previewImg.style.width = 'auto';
+
+                finalH = containerH;
+                finalW = containerH * imgRatio;
             } else {
+                // Image is narrower than container: constrained by width
+                // width = 100% (containerW)
                 previewImg.style.width = '100%';
                 previewImg.style.height = 'auto';
+
+                finalW = containerW;
+                finalH = containerW / imgRatio;
             }
+
             // Reset Scale
             currentScale = 1;
             zoomSlider.value = 1;
 
-            // Center
-            centerImage();
+            // Center using calculated dimensions
+            posX = (containerW - finalW) / 2;
+            posY = (containerH - finalH) / 2;
+
+            updateTransform();
         }
 
+        // centerImage is no longer needed separate but kept for safety if called elsewhere, mapped to new logic if possible or just empty
         function centerImage() {
-            // Basic centering logic implicitly handled by flex if no absolute, 
-            // but we rely on absolute + transform
-            // Just reset pos
-            posX = (cropContainer.clientWidth - previewImg.offsetWidth) / 2;
-            posY = (cropContainer.clientHeight - previewImg.offsetHeight) / 2;
-            updateTransform();
+            // Redundant with new fit logic, but if invoked manually:
+            fitImageToContainer();
         }
 
         function updateTransform() {
