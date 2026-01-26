@@ -713,8 +713,8 @@ const ViewManager = {
                         div.className = 'expense-img-preview';
                         div.style.cssText = "position: relative; flex-shrink: 0; width: 80px; height: 80px; border-radius: 8px; overflow: hidden; border: 1px solid #ddd;";
                         div.innerHTML = `
-                            <img src="${evt.target.result}" style="width: 100%; height: 100%; object-fit: cover;">
-                            <button type="button" class="btn-remove-img" style="position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.6); color: white; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; padding: 0; border: none;">
+                            <img src="${evt.target.result}" style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;" onclick="ViewManager.viewImageFull('${evt.target.result}')">
+                            <button type="button" class="btn-remove-img" style="position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.6); color: white; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; padding: 0; border: none; z-index: 2;">
                                 <span class="material-icons-round" style="font-size: 12px;">close</span>
                             </button>
                         `;
