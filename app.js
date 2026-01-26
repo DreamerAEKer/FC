@@ -526,6 +526,11 @@ const ViewManager = {
                              <button type="button" id="btn-camera" class="btn" style="background:#eee; padding: 8px 12px;">
                                 <span class="material-icons-round">camera_alt</span>
                             </button>
+                            <input type="file" id="inp-expense-photos" multiple accept="image/*" style="display:none;">
+                        </div>
+                        
+                        <!-- Image Previews -->
+                        <div id="preview-containter" style="display: flex; gap: 8px; overflow-x: auto; padding-top: 12px; padding-bottom: 4px;"></div>
                         </div>
                     </div>
 
@@ -674,13 +679,44 @@ const ViewManager = {
             if (fallbackText) document.getElementById('inp-title').value = fallbackText;
         });
 
-        // Mock Camera
+        // Real Camera / File Upload
+        const fileInput = document.getElementById('inp-expense-photos');
+        const previewContainer = document.getElementById('preview-containter');
+
         document.getElementById('btn-camera').addEventListener('click', () => {
-            alert('Simulated: Opened Camera / Selected Photo. OCR Scanning...');
-            setTimeout(() => {
-                document.getElementById('inp-title').value = "ใบเสร็จ 7-11";
-                document.getElementById('inp-amount').value = 350;
-            }, 1000);
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files && e.target.files.length > 0) {
+                // Clear existing (or append? User asked for "multiple", usually implies adding more or selecting all at once. 
+                // Let's append to allow adding more from different folders if needed, but simplest is just show what's currently in input)
+                // Actually file input value resets if we click again. Let's just render what is selected.
+                // To support true "add more", we need to manage an array.
+
+                Array.from(e.target.files).forEach(file => {
+                    const reader = new FileReader();
+                    reader.onload = (evt) => {
+                        const div = document.createElement('div');
+                        div.className = 'expense-img-preview';
+                        div.style.cssText = "position: relative; flex-shrink: 0; width: 80px; height: 80px; border-radius: 8px; overflow: hidden; border: 1px solid #ddd;";
+                        div.innerHTML = `
+                            <img src="${evt.target.result}" style="width: 100%; height: 100%; object-fit: cover;">
+                            <button type="button" class="btn-remove-img" style="position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.6); color: white; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; padding: 0; border: none;">
+                                <span class="material-icons-round" style="font-size: 12px;">close</span>
+                            </button>
+                        `;
+
+                        // Remove logic
+                        div.querySelector('.btn-remove-img').addEventListener('click', () => {
+                            div.remove();
+                        });
+
+                        previewContainer.appendChild(div);
+                    };
+                    reader.readAsDataURL(file);
+                });
+            }
         });
     },
 
@@ -713,7 +749,8 @@ const ViewManager = {
             amount,
             payerId,
             involvedIds,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            attachments: this.collectExpenseImages() // New Field
         };
 
         const trip = Store.data.trips.find(t => t.id === tripId);
@@ -728,6 +765,13 @@ const ViewManager = {
         } else {
             this.renderTripDetail(tripId);
         }
+    },
+
+    collectExpenseImages() {
+        const container = document.getElementById('preview-containter');
+        if (!container) return [];
+        const imgs = container.querySelectorAll('img');
+        return Array.from(imgs).map(img => img.src);
     },
 
     /**
@@ -779,6 +823,15 @@ const ViewManager = {
                             ยอดเต็ม: ฿${expense.amount.toLocaleString()} | หาร ${invCount} คน
                         </div>
                     </div>
+
+                   <!-- Attachments -->
+                   ${expense.attachments && expense.attachments.length > 0 ? `
+                        <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 16px; justify-content: center;">
+                            ${expense.attachments.map(src => `
+                                <img src="${src}" style="width: 60px; height: 60px; border-radius: 8px; object-fit: cover; border: 1px solid #eee;" onclick="ViewManager.viewImageFull('${src}')">
+                            `).join('')}
+                        </div>
+                   ` : ''}
 
                     <div style="border-top: 2px dashed #eee; margin: 16px 0;"></div>
 
@@ -895,6 +948,24 @@ const ViewManager = {
                 btnSave.innerText = originalText;
                 btnSave.disabled = false;
             });
+        });
+    },
+
+    viewImageFull(src) {
+        const modalContainer = document.getElementById('modal-container');
+        modalContainer.innerHTML = `
+            <div class="modal-overlay" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); z-index: 2500; display: flex; align-items: center; justify-content: center; padding: 20px;">
+                <img src="${src}" style="max-width: 100%; max-height: 90vh; border-radius: 4px;">
+                <button id="btn-close-img" style="position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.2); color: white; border: none; width: 40px; height: 40px; border-radius: 50%; cursor: pointer;">
+                    <span class="material-icons-round">close</span>
+                </button>
+            </div>
+        `;
+        document.getElementById('btn-close-img').addEventListener('click', () => {
+            modalContainer.innerHTML = '';
+        });
+        modalContainer.querySelector('.modal-overlay').addEventListener('click', (e) => {
+            if (e.target === modalContainer.querySelector('.modal-overlay')) modalContainer.innerHTML = '';
         });
     },
 
