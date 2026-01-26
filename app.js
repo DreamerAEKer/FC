@@ -868,7 +868,7 @@ const ViewManager = {
 
         // 2. Find Title (Vendor Name)
         // Heuristic: First line that isn't a header, looks like text, and is long enough.
-        for (let i = 0; i < Math.min(5, lines.length); i++) {
+        for (let i = 0; i < Math.min(6, lines.length); i++) {
             const line = lines[i];
 
             // Skip common headers
@@ -876,17 +876,34 @@ const ViewManager = {
             // Skip pure numbers or dates
             if (line.match(/^[\d\s\/\-\.:]+$/)) continue;
 
-            // Valid Title Check: Must have at least 3 chars, not start with special char
-            if (line.length > 3 && !line.match(/^[#@!&%-]/)) {
-                // If text seems like gibberish (mostly english consonants without vowels? hard to detect reliably)
-                // For now, accept it. User said "If < 100% unsure, leave empty". Use empty if really unsure.
-                // We'll trust strict length > 3 for now.
-                title = line;
-                break;
-            }
+            // STRICT Gibberish Check
+            // Reject if contains weird symbols like ) " { } [ ]
+            if (line.match(/[)"}\]{]/)) continue;
+            // Reject if length < 3
+            if (line.length < 3) continue;
+            // Reject if starts with special chars
+            if (line.match(/^[#@!&%-\.\,]/)) continue;
+
+            // If it passes all checks, take it.
+            title = line;
+            break;
+        }
+
+        // 3. Smart Default (Meal Period) if Title is empty
+        if (!title) {
+            title = this.detectMealPeriod();
         }
 
         return { amount, title };
+    },
+
+    detectMealPeriod() {
+        const hour = new Date().getHours();
+        if (hour >= 6 && hour < 11) return "มื้อเช้า";
+        if (hour >= 11 && hour < 14) return "มื้อเที่ยง";
+        if (hour >= 14 && hour < 17) return "ของว่าง / กาแฟ";
+        if (hour >= 17 && hour < 22) return "มื้อเย็น";
+        return "มื้อดึก / ทั่วไป";
     },
 
     submitExpenseWrapper(tripId) {
