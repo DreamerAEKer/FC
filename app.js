@@ -1037,13 +1037,16 @@ const ViewManager = {
                 <div class="modal-card" style="background: white; width: 100%; max-width: 350px; border-radius: 20px; padding: 24px;">
                     <h3 style="margin-bottom: 20px;">${isEdit ? 'แก้ไขทริป' : 'สร้างทริปใหม่'}</h3>
                     
-                    <!-- Cover Photo Upload -->
-                    <div style="display:flex; flex-direction:column; align-items:center; margin-bottom: 20px;">
-                        <div style="position: relative; width: 100%; height: 140px; border-radius: 12px; overflow: hidden; background: #f5f5f5; border: 2px dashed #ddd; display: flex; align-items: center; justify-content: center;">
-                            <div id="preview-trip-cover" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
-                                ${trip.photo ? `<img src="${trip.photo}" style="width:100%; height:100%; object-fit:cover;">` : `<span style="color:#aaa; font-size:0.9rem;">+ เพิ่มรูปปก</span>`}
-                            </div>
+                    <!-- Cover Photo Upload & Adjust -->
+                    <div style="margin-bottom: 20px;">
+                         <div id="crop-container" style="position: relative; width: 100%; height: 160px; border-radius: 12px; overflow: hidden; background: #333; border: 2px dashed #ddd; display: flex; align-items: center; justify-content: center; cursor: move; touch-action: none;">
+                            <div id="placeholder-text" style="color:#aaa; font-size:0.9rem; pointer-events: none; ${trip.photo ? 'display:none;' : ''}">+ เพิ่มรูปปก</div>
+                            <img id="preview-img" src="${trip.photo || ''}" style="position:absolute; ${trip.photo ? '' : 'display:none;'} transform-origin: center; transition: none;">
                             <input type="file" id="inp-trip-photo" accept="image/*" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
+                        </div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top: 8px;">
+                             <span style="font-size:0.7rem; color:#888;">ลากเพื่อจัดตำแหน่ง</span>
+                             <input type="range" id="zoom-slider" min="1" max="3" step="0.1" value="1" style="width: 100px; display:none;">
                         </div>
                     </div>
 
@@ -1066,53 +1069,136 @@ const ViewManager = {
             </div>
         `;
 
-        document.getElementById('inp-trip-name').focus();
-
-        // Helper functions from local scope (or reused)
+        const cropContainer = document.getElementById('crop-container');
+        const previewImg = document.getElementById('preview-img');
+        const zoomSlider = document.getElementById('zoom-slider');
         const photoInput = document.getElementById('inp-trip-photo');
-        const previewCover = document.getElementById('preview-trip-cover');
-        let currentPhotoBase64 = trip.photo;
 
-        // Image Logic
+        let currentScale = 1;
+        let posX = 0;
+        let posY = 0;
+        let isDragging = false;
+        let startX, startY, initialX, initialY;
+        let originalImage = null; // Store basic image object for cropping
+
+        // Load existing image if any
+        if (trip.photo) {
+            originalImage = new Image();
+            originalImage.src = trip.photo;
+            originalImage.onload = () => {
+                // Fit logic (cover)
+                fitImageToContainer();
+                zoomSlider.style.display = 'block';
+                photoInput.style.pointerEvents = 'none'; // Disable file click area so we can drag
+            };
+        }
+
+        function fitImageToContainer() {
+            const containerRatio = cropContainer.clientWidth / cropContainer.clientHeight;
+            const imgRatio = originalImage.width / originalImage.height;
+
+            // Standard "cover" fit initial
+            if (imgRatio > containerRatio) {
+                previewImg.style.height = '100%';
+                previewImg.style.width = 'auto';
+            } else {
+                previewImg.style.width = '100%';
+                previewImg.style.height = 'auto';
+            }
+            // Center
+            centerImage();
+        }
+
+        function centerImage() {
+            // Basic centering logic implicitly handled by flex if no absolute, 
+            // but we rely on absolute + transform
+            // Just reset pos
+            posX = (cropContainer.clientWidth - previewImg.offsetWidth) / 2;
+            posY = (cropContainer.clientHeight - previewImg.offsetHeight) / 2;
+            updateTransform();
+        }
+
+        function updateTransform() {
+            previewImg.style.transform = `translate(${posX}px, ${posY}px) scale(${currentScale})`;
+        }
+
+        // File Input
         photoInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
 
             const reader = new FileReader();
-            reader.onload = (event) => {
+            reader.onload = (evt) => {
                 const img = new Image();
                 img.onload = () => {
-                    // Resize Logic (Max 800x600 for covers)
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-                    const MAX_WIDTH = 800;
-                    const MAX_HEIGHT = 600;
-                    let width = img.width;
-                    let height = img.height;
+                    originalImage = img;
+                    previewImg.src = img.src;
+                    previewImg.style.display = 'block';
+                    document.getElementById('placeholder-text').style.display = 'none';
+                    photoInput.style.pointerEvents = 'none'; // Switch to drag mode
+                    zoomSlider.style.display = 'block';
 
-                    if (width > height) {
-                        if (width > MAX_WIDTH) {
-                            height *= MAX_WIDTH / width;
-                            width = MAX_WIDTH;
-                        }
-                    } else {
-                        if (height > MAX_HEIGHT) {
-                            width *= MAX_HEIGHT / height;
-                            height = MAX_HEIGHT;
-                        }
-                    }
-
-                    canvas.width = width;
-                    canvas.height = height;
-                    ctx.drawImage(img, 0, 0, width, height);
-                    currentPhotoBase64 = canvas.toDataURL('image/jpeg', 0.8);
-                    previewCover.innerHTML = `<img src="${currentPhotoBase64}" style="width:100%; height:100%; object-fit:cover;">`;
-                    previewCover.parentElement.style.border = 'none'; // remove dashed
+                    fitImageToContainer();
                 };
-                img.src = event.target.result;
+                img.src = evt.target.result;
             };
             reader.readAsDataURL(file);
         });
+
+        // Zoom
+        zoomSlider.addEventListener('input', (e) => {
+            currentScale = parseFloat(e.target.value);
+            updateTransform();
+        });
+
+        // Drag Logic (Mouse + Touch)
+        const startDrag = (e) => {
+            if (!originalImage) return; // Only if image loaded
+            // If clicking the file input, let it handle file. 
+            // But we disabled pointerEvents on file input when image loaded.
+
+            isDragging = true;
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+            startX = clientX;
+            startY = clientY;
+            initialX = posX;
+            initialY = posY;
+            cropContainer.style.cursor = 'grabbing';
+            e.preventDefault(); // Prevent scroll on mobile
+        };
+
+        const moveDrag = (e) => {
+            if (!isDragging) return;
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+            const dx = clientX - startX;
+            const dy = clientY - startY;
+
+            posX = initialX + dx;
+            posY = initialY + dy;
+            updateTransform();
+        };
+
+        const stopDrag = () => {
+            isDragging = false;
+            cropContainer.style.cursor = 'move';
+        };
+
+        cropContainer.addEventListener('mousedown', startDrag);
+        cropContainer.addEventListener('touchstart', startDrag);
+
+        window.addEventListener('mousemove', moveDrag);
+        window.addEventListener('touchmove', moveDrag, { passive: false });
+
+        window.addEventListener('mouseup', stopDrag);
+        window.addEventListener('touchend', stopDrag);
+
+        // --- End UI Logic ---
+
+        document.getElementById('inp-trip-name').focus();
 
         // Voice Logic
         document.getElementById('btn-voice-trip').addEventListener('click', () => {
@@ -1124,39 +1210,83 @@ const ViewManager = {
             const btn = document.getElementById('btn-voice-trip');
             btn.style.background = '#ff5252';
             btn.style.color = 'white';
-
             recognition.start();
-
-            recognition.onresult = (e) => {
-                const text = e.results[0][0].transcript;
-                document.getElementById('inp-trip-name').value = text;
-            };
-            recognition.onspeechend = () => {
-                recognition.stop();
-                btn.style.background = '#eee';
-                btn.style.color = 'black';
-            };
+            recognition.onresult = (e) => { document.getElementById('inp-trip-name').value = e.results[0][0].transcript; };
+            recognition.onspeechend = () => { recognition.stop(); btn.style.background = '#eee'; btn.style.color = 'black'; };
             recognition.onerror = () => {
                 btn.style.background = '#eee';
                 btn.style.color = 'black';
             };
         });
 
-        document.getElementById('btn-cancel-trip-modal').addEventListener('click', () => modalContainer.innerHTML = '');
+        document.getElementById('btn-cancel-trip-modal').addEventListener('click', () => {
+            // Cleanup global listeners to avoid leaks if reopening
+            window.removeEventListener('mousemove', moveDrag);
+            window.removeEventListener('touchmove', moveDrag);
+            window.removeEventListener('mouseup', stopDrag);
+            window.removeEventListener('touchend', stopDrag);
+            modalContainer.innerHTML = '';
+        });
 
         document.getElementById('btn-save-trip-modal').addEventListener('click', () => {
             const name = document.getElementById('inp-trip-name').value.trim();
             if (!name) return alert('กรุณาใส่ชื่อทริป');
 
+            let finalPhoto = trip.photo;
+
+            // Crop Logic
+            if (originalImage) {
+                const canvas = document.createElement('canvas');
+                // Target Output Size (e.g. 2:1 ratio for nice banner)
+                canvas.width = 800;
+                canvas.height = 400;
+                const ctx = canvas.getContext('2d');
+
+                // Get rendered size relative to container
+                const imgRenderedWidth = previewImg.offsetWidth * currentScale;
+                const imgRenderedHeight = previewImg.offsetHeight * currentScale;
+                const containerWidth = cropContainer.clientWidth;
+                const containerHeight = cropContainer.clientHeight;
+
+                // Calculate scale factor between Container and Canvas
+                const scaleX = canvas.width / containerWidth;
+                const scaleY = canvas.height / containerHeight;
+                // We use one scale to maintain aspect ratio, but here we want to map explicitly
+                // Actually safer to crop based on visual percentage
+
+                // Draw logic:
+                // We draw the image at the position relative to the canvas 0,0 matched to container 0,0
+                // PosX, PosY is relative to container top-left
+
+                const drawX = posX * scaleX; // Scaled position
+                const drawY = posY * scaleY;
+                const drawW = imgRenderedWidth * scaleX;
+                const drawH = imgRenderedHeight * scaleX; // Assume square pixels
+
+                // Fill background (if image dragged too far)
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                ctx.drawImage(originalImage, drawX, drawY, drawW, drawH);
+
+                finalPhoto = canvas.toDataURL('image/jpeg', 0.85);
+            }
+
             if (isEdit) {
                 trip.name = name;
-                trip.photo = currentPhotoBase64;
+                trip.photo = finalPhoto;
                 Store.save();
                 this.renderTripDetail(tripId);
             } else {
-                Store.addTrip(name, currentPhotoBase64);
+                Store.addTrip(name, finalPhoto);
                 this.renderTripList();
             }
+
+            // Cleanup
+            window.removeEventListener('mousemove', moveDrag);
+            window.removeEventListener('touchmove', moveDrag);
+            window.removeEventListener('mouseup', stopDrag);
+            window.removeEventListener('touchend', stopDrag);
             modalContainer.innerHTML = '';
         });
     },
