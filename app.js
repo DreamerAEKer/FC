@@ -1043,6 +1043,11 @@ const ViewManager = {
                             <div id="placeholder-text" style="color:#aaa; font-size:0.9rem; pointer-events: none; ${trip.photo ? 'display:none;' : ''}">+ เพิ่มรูปปก</div>
                             <img id="preview-img" src="${trip.photo || ''}" style="position:absolute; ${trip.photo ? '' : 'display:none;'} transform-origin: center; transition: none;">
                             <input type="file" id="inp-trip-photo" accept="image/*" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
+                            
+                            <!-- Remove Button -->
+                            <button id="btn-remove-trip-photo" style="position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.6); color: white; border: none; width: 32px; height: 32px; border-radius: 50%; display: ${trip.photo ? 'flex' : 'none'}; align-items: center; justify-content: center; cursor: pointer; z-index: 10;">
+                                <span class="material-icons-round" style="font-size: 18px;">delete</span>
+                            </button>
                         </div>
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-top: 8px;">
                              <span style="font-size:0.7rem; color:#888;">ลากเพื่อจัดตำแหน่ง (Slide to Pan)</span>
@@ -1158,6 +1163,7 @@ const ViewManager = {
                     previewImg.src = img.src;
                     previewImg.style.display = 'block';
                     document.getElementById('placeholder-text').style.display = 'none';
+                    document.getElementById('btn-remove-trip-photo').style.display = 'flex'; // Show remove btn
                     photoInput.style.pointerEvents = 'none'; // Switch to drag mode
                     zoomSlider.style.display = 'block';
 
@@ -1166,6 +1172,25 @@ const ViewManager = {
                 img.src = evt.target.result;
             };
             reader.readAsDataURL(file);
+        });
+
+        // Remove Photo Logic
+        document.getElementById('btn-remove-trip-photo').addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent triggering other clicks? Not needed usually but good practice
+            e.preventDefault();
+
+            originalImage = null;
+            previewImg.src = '';
+            previewImg.style.display = 'none';
+            document.getElementById('placeholder-text').style.display = 'block';
+            document.getElementById('btn-remove-trip-photo').style.display = 'none';
+            zoomSlider.style.display = 'none';
+
+            photoInput.value = ''; // Reset input
+            photoInput.style.pointerEvents = 'auto'; // Re-enable click
+
+            // Important: Update trip state so if saved, it's cleared
+            trip.photo = null;
         });
 
         // Zoom
