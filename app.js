@@ -245,7 +245,7 @@ const ViewManager = {
                             <span class="material-icons-round">add</span> ค่าใช้จ่ายใหม่
                         </button>
                          <button id="btn-import-card" class="btn" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.4);">
-                            <span class="material-icons-round">qr_code_scanner</span> นำเข้าการ์ด
+                            <span class="material-icons-round">qr_code_scanner</span> นำเข้าด้วย QR
                         </button>
                     </div>
                     
@@ -689,12 +689,24 @@ const ViewManager = {
 
         fileInput.addEventListener('change', (e) => {
             if (e.target.files && e.target.files.length > 0) {
-                // Clear existing (or append? User asked for "multiple", usually implies adding more or selecting all at once. 
-                // Let's append to allow adding more from different folders if needed, but simplest is just show what's currently in input)
-                // Actually file input value resets if we click again. Let's just render what is selected.
-                // To support true "add more", we need to manage an array.
+                // OCR Status Indicator
+                const btnCamera = document.getElementById('btn-camera');
+                const originalIcon = btnCamera.innerHTML;
+                btnCamera.innerHTML = `<span class="material-icons-round spinning">autorenew</span>`;
+                btnCamera.disabled = true;
 
-                Array.from(e.target.files).forEach(file => {
+                // Process files
+                const files = Array.from(e.target.files);
+
+                // OCR: functionality (process first image only for now)
+                if (files.length > 0) {
+                    this.performOCR(files[0]).finally(() => {
+                        btnCamera.innerHTML = originalIcon;
+                        btnCamera.disabled = false;
+                    });
+                }
+
+                files.forEach(file => {
                     const reader = new FileReader();
                     reader.onload = (evt) => {
                         const div = document.createElement('div');
@@ -718,6 +730,138 @@ const ViewManager = {
                 });
             }
         });
+    },
+
+    async performOCR(file) {
+        if (typeof Tesseract === 'undefined') {
+            console.error("Tesseract not loaded");
+            return;
+        }
+
+        console.log("Starting OCR on", file.name);
+
+        try {
+            // Create a specific toast/pill for status
+            let statusPill = document.getElementById("ocr-status-pill");
+            if (!statusPill) {
+                statusPill = document.createElement('div');
+                statusPill.id = "ocr-status-pill";
+                statusPill.style.cssText = "position:absolute; top: -40px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 8px 16px; border-radius: 20px; font-size: 0.8rem; z-index: 100; white-space: nowrap; box-shadow: 0 4px 10px rgba(0,0,0,0.2); transition: top 0.3s;";
+                document.querySelector('#add-expense-view').appendChild(statusPill);
+                setTimeout(() => statusPill.style.top = "10px", 100);
+            }
+            statusPill.innerText = "กำลังสแกนใบเสร็จ...";
+
+            const result = await Tesseract.recognize(
+                file,
+                'tha+eng',
+                {
+                    logger: m => {
+                        if (m.status === 'recognizing text') {
+                            statusPill.innerText = `กำลังอ่าน... ${(m.progress * 100).toFixed(0)}%`;
+                        }
+                    }
+                }
+            );
+
+            const text = result.data.text;
+            console.log("OCR Result:", text);
+            statusPill.innerText = "อ่านข้อมูลสำเร็จ!";
+            statusPill.style.background = "#4CAF50";
+
+            // Parse
+            const parsed = this.parseReceiptText(text);
+
+            if (parsed.amount) {
+                const inpAmount = document.getElementById('inp-amount');
+                if (!inpAmount.value) { // Only auto-fill if empty
+                    inpAmount.value = parsed.amount;
+                    // Visual cues
+                    inpAmount.style.transition = "background 0.3s";
+                    inpAmount.style.backgroundColor = "#e8f5e9";
+                    setTimeout(() => inpAmount.style.backgroundColor = "white", 1000);
+                }
+            }
+
+            if (parsed.title) {
+                const inpTitle = document.getElementById('inp-title');
+                if (!inpTitle.value) {
+                    inpTitle.value = parsed.title;
+                    inpTitle.style.transition = "background 0.3s";
+                    inpTitle.style.backgroundColor = "#e8f5e9";
+                    setTimeout(() => inpTitle.style.backgroundColor = "white", 1000);
+                }
+            }
+
+            setTimeout(() => {
+                statusPill.style.top = "-50px";
+                setTimeout(() => statusPill.remove(), 500);
+            }, 2000);
+
+        } catch (err) {
+            console.error("OCR Error", err);
+            const statusPill = document.getElementById("ocr-status-pill");
+            if (statusPill) {
+                statusPill.innerText = "อ่านไม่สำเร็จ";
+                statusPill.style.background = "#ff5252";
+                setTimeout(() => statusPill.remove(), 2000);
+            }
+        }
+    },
+
+    parseReceiptText(text) {
+        const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+        let amount = null;
+        let title = null;
+
+        // 1. Find Amount
+        // Regex for currency: 100.00, 1,000.00
+        const moneyRegex = /([\d,]+\.\d{2})/;
+
+        let bestAmountLine = -1;
+
+        // Strategy A: Look for keywords
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].toLowerCase();
+            if (line.includes('total') || line.includes('รวม') || line.includes('net') || line.includes('amount')) {
+                const match = line.match(moneyRegex);
+                if (match) {
+                    amount = parseFloat(match[1].replace(/,/g, ''));
+                    bestAmountLine = i;
+                }
+            }
+        }
+
+        // Strategy B: If no keyword, look for the largest number at the bottom half (heuristic)
+        if (!amount) {
+            // Check last 5 lines
+            for (let i = lines.length - 1; i >= Math.max(0, lines.length - 10); i--) {
+                const match = lines[i].match(moneyRegex);
+                if (match) {
+                    const val = parseFloat(match[1].replace(/,/g, ''));
+                    if (val > (amount || 0)) {
+                        amount = val;
+                    }
+                }
+            }
+        }
+
+        // 2. Find Title (Vendor Name)
+        // Usually the first non-empty line, skipping common header words
+        for (let i = 0; i < Math.min(5, lines.length); i++) {
+            const line = lines[i];
+            // Skip common headers
+            if (line.match(/(tax invoice|receipt|ใบเสร็จ|ใบกำกับ|table|date)/i)) continue;
+            // Skip pure numbers or dates
+            if (line.match(/^[\d\s\/\-\.:]+$/)) continue; // e.g. "20/10/2023 10:00"
+
+            if (line.length > 2) {
+                title = line;
+                break;
+            }
+        }
+
+        return { amount, title };
     },
 
     submitExpense(tripId) {
