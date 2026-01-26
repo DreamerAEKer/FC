@@ -165,52 +165,49 @@ const Store = {
                 delete incomingTrip._embeddedMembers; // Clean up
             }
 
-            delete incomingTrip._embeddedMembers; // Clean up
-        }
-
             // Find existing trip or create new
             let existingTrip = this.data.trips.find(t => t.id === incomingTrip.id);
 
-        if (!existingTrip) {
-            // New Trip
-            this.data.trips.unshift(incomingTrip);
-        } else {
-            // Merge Logic
-            // 1. Merge Members (Union)
-            const existingMembers = new Set(existingTrip.members || []);
-            (incomingTrip.members || []).forEach(mId => existingMembers.add(mId));
-            existingTrip.members = Array.from(existingMembers);
+            if (!existingTrip) {
+                // New Trip
+                this.data.trips.unshift(incomingTrip);
+            } else {
+                // Merge Logic
+                // 1. Merge Members (Union)
+                const existingMembers = new Set(existingTrip.members || []);
+                (incomingTrip.members || []).forEach(mId => existingMembers.add(mId));
+                existingTrip.members = Array.from(existingMembers);
 
-            // 2. Merge Expenses (Upsert by ID)
-            if (!existingTrip.expenses) existingTrip.expenses = [];
-            const expenseMap = new Map();
-            existingTrip.expenses.forEach(e => expenseMap.set(e.id, e));
+                // 2. Merge Expenses (Upsert by ID)
+                if (!existingTrip.expenses) existingTrip.expenses = [];
+                const expenseMap = new Map();
+                existingTrip.expenses.forEach(e => expenseMap.set(e.id, e));
 
-            (incomingTrip.expenses || []).forEach(e => {
-                // Overwrite if incoming is newer? Or just trust incoming as 'update'?
-                // For simplicity: Incoming overwrites existing (Last Write Wins roughly).
-                expenseMap.set(e.id, e);
-            });
+                (incomingTrip.expenses || []).forEach(e => {
+                    // Overwrite if incoming is newer? Or just trust incoming as 'update'?
+                    // For simplicity: Incoming overwrites existing (Last Write Wins roughly).
+                    expenseMap.set(e.id, e);
+                });
 
-            existingTrip.expenses = Array.from(expenseMap.values());
+                existingTrip.expenses = Array.from(expenseMap.values());
 
-            // Sort by timestamp desc
-            existingTrip.expenses.sort((a, b) => b.timestamp - a.timestamp);
+                // Sort by timestamp desc
+                existingTrip.expenses.sort((a, b) => b.timestamp - a.timestamp);
+            }
+
+            // Sync global friends if needed? 
+            // Ideally we should sync friend details too, but friends are global ID linked.
+            // For this prototype, we assume friend IDs match if created on one device and shared.
+            // (To fix properly: Trip needs to carry concise Friend Profiles too).
+
+            this.save();
+            return incomingTrip.id;
+        } catch (e) {
+            console.error('Import failed', e);
+            alert('รหัสไม่ถูกต้อง หรือข้อมูลเสียหาย');
+            return null;
         }
-
-        // Sync global friends if needed? 
-        // Ideally we should sync friend details too, but friends are global ID linked.
-        // For this prototype, we assume friend IDs match if created on one device and shared.
-        // (To fix properly: Trip needs to carry concise Friend Profiles too).
-
-        this.save();
-        return incomingTrip.id;
-    } catch(e) {
-        console.error('Import failed', e);
-        alert('รหัสไม่ถูกต้อง หรือข้อมูลเสียหาย');
-        return null;
-    }
-},
+    },
 
     /**
      * Image Compression Helper
@@ -2519,7 +2516,10 @@ let touchCurrentX = 0;
 let activeSwipeEl = null;
 
 window.handleSwipeStart = (e) => {
-    touchStartX = e.touches[0].clientX;
+    // Support Mouse or Touch
+    const isTouch = e.type === 'touchstart';
+    touchStartX = isTouch ? e.touches[0].clientX : e.clientX;
+
     activeSwipeEl = e.currentTarget;
     activeSwipeEl.style.transition = 'none'; // Follow finger instantly
 };
