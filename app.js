@@ -317,17 +317,22 @@ const ViewManager = {
             return;
         }
 
-        listContainer.innerHTML = trips.map(trip => `
-            <div class="trip-card" onclick="ViewManager.openTrip('${trip.id}')" style="background: white; padding: 16px; border-radius: 12px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
-                <div>
-                    <h4 style="font-size: 1.1rem; margin-bottom: 4px;">${trip.name}</h4>
+        listContainer.innerHTML = trips.map(trip => {
+            const bgStyle = trip.photo
+                ? `background: linear-gradient(to right, #ffffff 30%, rgba(255,255,255,0) 100%), url('${trip.photo}') right center / cover no-repeat;`
+                : `background: white;`;
+
+            return `
+            <div class="trip-card" onclick="ViewManager.openTrip('${trip.id}')" style="${bgStyle} padding: 16px; border-radius: 12px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; cursor: pointer; position: relative; overflow: hidden;">
+                <div style="position: relative; z-index: 2; max-width: 60%;">
+                    <h4 style="font-size: 1.1rem; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${trip.name}</h4>
                     <span style="font-size: 0.85rem; color: #666;">${new Date(trip.date).toLocaleDateString('th-TH')}</span>
                 </div>
-                <button class="btn" style="background: #f0f0f0; border-radius: 50%; width: 40px; height: 40px; padding: 0; justify-content: center;">
+                <button class="btn" style="background: rgba(255,255,255,0.8); border-radius: 50%; width: 40px; height: 40px; padding: 0; justify-content: center; position: relative; z-index: 2; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                     <span class="material-icons-round">arrow_forward</span>
                 </button>
             </div>
-        `).join('');
+        `}).join('');
     },
 
     createNewTrip() {
