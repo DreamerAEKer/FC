@@ -562,7 +562,7 @@ const ViewManager = {
                         </div>
                     </div>
 
-                    <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 16px;">
+                    <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 16px; margin-bottom: 80px; box-shadow: 0 4px 15px rgba(98, 0, 238, 0.4);">
                         บันทึกรายการ
                     </button>
                 </form>

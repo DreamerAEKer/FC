@@ -7,7 +7,7 @@
     --background-color: #F5F7FA;
     --surface-color: #FFFFFF;
     --error-color: #B00020;
-    
+
     /* Text Colors */
     --text-primary: #121212;
     --text-secondary: #666666;
@@ -27,9 +27,9 @@
     --radius-full: 9999px;
 
     /* Shadows */
-    --shadow-sm: 0 2px 4px rgba(0,0,0,0.05);
-    --shadow-md: 0 4px 12px rgba(0,0,0,0.1);
-    --shadow-lg: 0 8px 24px rgba(0,0,0,0.15);
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.15);
 }
 
 * {
@@ -45,17 +45,23 @@ body {
     color: var(--text-primary);
     overflow-x: hidden;
     height: 100vh;
+    /* Fallback */
+    height: 100dvh;
+    /* Dynamic Viewport Height for Mobile */
 }
 
 #app {
     display: flex;
     flex-direction: column;
     height: 100vh;
-    max-width: 600px; /* Tablet constraint */
+    /* Fallback */
+    height: 100dvh;
+    max-width: 600px;
+    /* Tablet constraint */
     margin: 0 auto;
     background-color: var(--background-color);
     position: relative;
-    box-shadow: 0 0 40px rgba(0,0,0,0.05);
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.05);
 }
 
 /* Header */
@@ -82,7 +88,8 @@ body {
     flex: 1;
     overflow-y: auto;
     padding: var(--spacing-md);
-    padding-bottom: 140px; /* Space for bottom nav + FAB + Safe Area */
+    padding-bottom: 140px;
+    /* Space for bottom nav + FAB + Safe Area */
 }
 
 /* Typography & Components */
@@ -157,7 +164,7 @@ h3 {
     justify-content: space-around;
     align-items: center;
     padding: 12px var(--spacing-sm);
-    box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
     border-top-left-radius: var(--radius-md);
     border-top-right-radius: var(--radius-md);
     z-index: 100;
@@ -191,7 +198,8 @@ h3 {
     height: 56px;
     border-radius: 50%;
     justify-content: center;
-    margin-bottom: 24px; /* Floating effect */
+    margin-bottom: 24px;
+    /* Floating effect */
     box-shadow: 0 4px 12px rgba(98, 0, 238, 0.4);
 }
 
@@ -200,4 +208,6 @@ h3 {
 }
 
 /* Utilities */
-.hidden { display: none !important; }
+.hidden {
+    display: none !important;
+}
