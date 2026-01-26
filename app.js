@@ -562,14 +562,13 @@ const ViewManager = {
                         </div>
                     </div>
 
-                    <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 16px; margin-bottom: 80px; box-shadow: 0 4px 15px rgba(98, 0, 238, 0.4);">
+                    <button type="button" id="btn-submit-expense" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 16px; margin-bottom: 80px; box-shadow: 0 4px 15px rgba(98, 0, 238, 0.4); position: relative; z-index: 105;">
                         บันทึกรายการ
                     </button>
                 </form>
             </div>
         `;
 
-        // Styling for radio/checkbox interaction
         // Styling for radio/checkbox interaction
         const inputs = mainContent.querySelectorAll('.radio-chip input, .checkbox-chip input');
 
@@ -615,15 +614,22 @@ const ViewManager = {
             this.renderTripDetail(tripId);
         });
 
-        document.getElementById('form-expense').addEventListener('submit', (e) => {
+        // FIX: Use Click Listener manually to ensure it fires even if form validation is silent
+        document.getElementById('btn-submit-expense').addEventListener('click', (e) => {
             e.preventDefault();
-            console.log("Submit clicked"); // Debug
+            console.log("Button Clicked Manually");
 
-            // Validation Debug
-            const amount = document.getElementById('inp-amount').value;
-            const title = document.getElementById('inp-title').value;
-            if (!amount || !title) {
-                alert('Debug: Values missing - Amount: ' + amount + ', Title: ' + title);
+            // Manual Validation Report
+            const amountVal = document.getElementById('inp-amount').value;
+            const titleVal = document.getElementById('inp-title').value;
+
+            if (!amountVal) {
+                alert('กรุณากรอกจำนวนเงิน');
+                return;
+            }
+            if (!titleVal) {
+                alert('กรุณากรอกชื่อรายการ');
+                return;
             }
 
             try {
