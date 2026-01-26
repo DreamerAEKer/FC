@@ -1400,24 +1400,5 @@ document.addEventListener('DOMContentLoaded', () => {
     window.ViewManager = ViewManager;
 
     Store.init();
-
-    // Header Title Edit Logic
-    const pageTitle = document.getElementById('page-title');
-    if (pageTitle) {
-        if (Store.data.appName) {
-            pageTitle.textContent = Store.data.appName;
-        }
-        pageTitle.addEventListener('click', () => {
-            const currentName = pageTitle.textContent;
-            const newName = prompt('ตั้งชื่อแอปของคุณ:', currentName);
-            if (newName && newName.trim() !== '') {
-                pageTitle.textContent = newName.trim();
-                Store.data.appName = newName.trim();
-                Store.save();
-            }
-        });
-        pageTitle.style.cursor = 'pointer';
-    }
-
     ViewManager.init();
 });
