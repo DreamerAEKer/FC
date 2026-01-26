@@ -1691,6 +1691,10 @@ Object.assign(ViewManager, {
                     <button class="btn" id="btn-back-friends" style="position: absolute; left: 16px; top: 16px; padding: 8px; width: 40px; height: 40px; justify-content: center; background: white; box-shadow: var(--shadow-sm);">
                         <span class="material-icons-round">arrow_back</span>
                     </button>
+                    <!-- Top Right Close Button -->
+                    <button class="btn" id="btn-close-friends-edit" style="position: absolute; right: 16px; top: 16px; padding: 8px; width: 40px; height: 40px; justify-content: center; background: #f5f5f5; color: #666; border-radius: 50%;">
+                        <span class="material-icons-round">close</span>
+                    </button>
                     <h3>${isEdit ? 'แก้ไขข้อมูล' : 'เพิ่มเพื่อนใหม่'}</h3>
                 </div>
 
@@ -1819,10 +1823,18 @@ Object.assign(ViewManager, {
             this.renderFriends();
         });
 
-        // Logic: Back
+        // Logic: Back (Left)
         document.getElementById('btn-back-friends').addEventListener('click', () => {
             this.renderFriends();
         });
+
+        // Logic: Close (Right)
+        const btnClose = document.getElementById('btn-close-friends-edit');
+        if (btnClose) {
+            btnClose.addEventListener('click', () => {
+                this.renderFriends();
+            });
+        }
 
         // Logic: Delete
         const btnDelete = document.getElementById('btn-delete-friend');
