@@ -617,7 +617,21 @@ const ViewManager = {
 
         document.getElementById('form-expense').addEventListener('submit', (e) => {
             e.preventDefault();
-            this.submitExpense(tripId);
+            console.log("Submit clicked"); // Debug
+
+            // Validation Debug
+            const amount = document.getElementById('inp-amount').value;
+            const title = document.getElementById('inp-title').value;
+            if (!amount || !title) {
+                alert('Debug: Values missing - Amount: ' + amount + ', Title: ' + title);
+            }
+
+            try {
+                this.submitExpense(tripId);
+            } catch (err) {
+                alert('Error submitting: ' + err.message);
+                console.error(err);
+            }
         });
 
         // Voice Recognition (Web Speech API)
