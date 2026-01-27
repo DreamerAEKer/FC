@@ -713,9 +713,18 @@ const ViewManager = {
                         </div>
                     </div>
 
-                     <!-- Split Among -->
-                    <div class="input-group" style="margin-bottom: 32px;">
-                        <label style="display:block; margin-bottom:8px; font-weight:500;">หารกับใครบ้าง (ติ๊กถูกทุกคนที่จะหาร)</label>
+                <!-- Split Mode -->
+                     <div class="input-group" style="margin-bottom: 16px;">
+                        <label style="display:block; margin-bottom:8px; font-weight:500;">รูปแบบการหาร</label>
+                        <div style="display:flex; background:#eee; padding:4px; border-radius:12px;">
+                            <button type="button" id="btn-split-equal" class="btn" onclick="ViewManager.toggleSplitMode('equal')" style="flex:1; justify-content:center; border-radius:8px; background:white; font-size:0.9rem; box-shadow:0 1px 2px rgba(0,0,0,0.1); color: var(--primary-color); font-weight:600;">หารเท่ากัน</button>
+                            <button type="button" id="btn-split-custom" class="btn" onclick="ViewManager.toggleSplitMode('custom')" style="flex:1; justify-content:center; border-radius:8px; background:transparent; font-size:0.9rem; color:#666;">ระบุเอง</button>
+                        </div>
+                    </div>
+
+                    <!-- Split Among (Equal) -->
+                    <div id="split-equal-container" class="input-group" style="margin-bottom: 32px;">
+                        <label style="display:block; margin-bottom:8px; font-weight:500; font-size:0.9rem; color:#666;">ใครหารบ้าง (ติ๊กถูกทุกคนรวมคนจ่าย)</label>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
                             ${members.map(m => `
                                 <label class="checkbox-chip" style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #fff; border: 1px solid #eee; border-radius: 12px; min-height: 50px;">
@@ -724,6 +733,28 @@ const ViewManager = {
                                 </label>
                             `).join('')}
                         </div>
+                    </div>
+
+                    <!-- Split Among (Custom) -->
+                    <div id="split-custom-container" class="input-group" style="margin-bottom: 32px; display:none;">
+                         <label style="display:block; margin-bottom:8px; font-weight:500; font-size:0.9rem; color:#666;">ระบุยอด (รวมต้องเท่ากับยอดจ่าย)</label>
+                         <div style="display: flex; flex-direction:column; gap: 8px;">
+                            ${members.map(m => {
+            const val = editingExpense && editingExpense.splitData ? (editingExpense.splitData[m.id] || '') : '';
+            return `
+                                <div style="display:flex; align-items:center; justify-content:space-between; background:white; padding:8px 12px; border-radius:12px; border:1px solid #eee;">
+                                    <span>${m.name}</span>
+                                    <input type="number" inputmode="decimal" step="0.01" class="inp-custom-split" data-id="${m.id}" value="${val}" placeholder="0.00" oninput="ViewManager.updateCustomTotal()" style="width:120px; padding:8px; border:1px solid #ddd; border-radius:8px; text-align:right; font-size:1rem;">
+                                </div>
+                            `}).join('')}
+                         </div>
+                         <div style="display:flex; justify-content:space-between; margin-top:12px; font-size:0.9rem; padding: 0 4px;">
+                            <span style="color:#666;">ยอดที่ต้องหาร</span>
+                            <div>
+                                รวม: <span id="txt-custom-total" style="font-weight:600;">0.00</span> / <span id="txt-target-total">0.00</span>
+                            </div>
+                         </div>
+                         <div id="txt-custom-diff" style="text-align:right; font-size:0.8rem; color:#aaa; margin-top:4px;"></div>
                     </div>
 
                     ${isEdit ? `
@@ -741,6 +772,15 @@ const ViewManager = {
                 </form>
             </div>
         `;
+
+        // Check Mode
+        if (editingExpense && editingExpense.splitData) {
+            // Switch to Custom Mode View
+            setTimeout(() => this.toggleSplitMode('custom'), 0);
+        }
+
+        // Init Custom Total
+        setTimeout(() => this.updateCustomTotal(), 100);
 
         // Styling for radio/checkbox interaction
         const inputs = mainContent.querySelectorAll('.radio-chip input, .checkbox-chip input');
@@ -1158,6 +1198,39 @@ const ViewManager = {
             return;
         }
 
+        // 1.5 Handle Custom Split Logic
+        const isCustomSplit = document.getElementById('btn-split-custom').classList.contains('active-mode');
+        let splitData = null;
+
+        if (isCustomSplit) {
+            splitData = {};
+            let customSum = 0;
+            const customInputs = document.querySelectorAll('.inp-custom-split');
+
+            customInputs.forEach(inp => {
+                const val = parseFloat(inp.value) || 0;
+                if (val > 0) {
+                    splitData[inp.dataset.id] = val;
+                    customSum += val;
+                }
+            });
+
+            // Tolerance check for floating point issues
+            if (Math.abs(customSum - amount) > 0.05) {
+                alert(`ยอดรวมที่ระบุ (${customSum.toLocaleString()}) ไม่ตรงกับยอดจ่าย (${amount.toLocaleString()})`);
+                return;
+            }
+
+            // Override involvedIds based on who has amount > 0
+            involvedIds.length = 0; // Clear
+            Object.keys(splitData).forEach(id => involvedIds.push(id));
+
+            if (involvedIds.length === 0) {
+                alert('ต้องระบุยอดเงินอย่างน้อย 1 คน');
+                return;
+            }
+        }
+
         // 2. Collect Images Safe Check
         let attachmentList = [];
         try {
@@ -1174,7 +1247,8 @@ const ViewManager = {
             payerId,
             involvedIds,
             timestamp: expenseId ? (trip.expenses.find(e => e.id === expenseId)?.timestamp || Date.now()) : Date.now(),
-            attachments: attachmentList
+            attachments: attachmentList,
+            splitData: splitData // New Field
         };
 
         // 3. Trip Validated at start
@@ -1591,10 +1665,18 @@ const ViewManager = {
                 balances[e.payerId] += e.amount;
 
                 // Involved people get debt
-                const splitAmount = e.amount / e.involvedIds.length;
-                e.involvedIds.forEach(id => {
-                    balances[id] -= splitAmount;
-                });
+                if (e.splitData) {
+                    // Custom Split: Use specific amounts using Object.entries to iterate safe
+                    Object.entries(e.splitData).forEach(([memberId, amt]) => {
+                        balances[memberId] -= amt;
+                    });
+                } else {
+                    // Equal Split
+                    const splitAmount = e.amount / e.involvedIds.length;
+                    e.involvedIds.forEach(id => {
+                        balances[id] -= splitAmount;
+                    });
+                }
             });
         }
 
@@ -2273,6 +2355,82 @@ const ViewManager = {
             if (onSuccessCallback) onSuccessCallback(newFriend.id);
             modalContainer.innerHTML = '';
         });
+    },
+
+    // --- Helper Methods for Custom Split ---
+    toggleSplitMode(mode) {
+        const btnEqual = document.getElementById('btn-split-equal');
+        const btnCustom = document.getElementById('btn-split-custom');
+        const boxEqual = document.getElementById('split-equal-container');
+        const boxCustom = document.getElementById('split-custom-container');
+
+        if (mode === 'equal') {
+            btnEqual.style.background = 'white';
+            btnEqual.style.color = 'var(--primary-color)';
+            btnEqual.style.fontWeight = '600';
+            btnEqual.style.boxShadow = '0 1px 2px rgba(0,0,0,0.1)';
+            btnEqual.classList.add('active-mode');
+
+            btnCustom.style.background = 'transparent';
+            btnCustom.style.color = '#666';
+            btnCustom.style.fontWeight = '400';
+            btnCustom.style.boxShadow = 'none';
+            btnCustom.classList.remove('active-mode');
+
+            boxEqual.style.display = 'block';
+            boxCustom.style.display = 'none';
+        } else {
+            btnCustom.style.background = 'white';
+            btnCustom.style.color = 'var(--primary-color)';
+            btnCustom.style.fontWeight = '600';
+            btnCustom.style.boxShadow = '0 1px 2px rgba(0,0,0,0.1)';
+            btnCustom.classList.add('active-mode');
+
+            btnEqual.style.background = 'transparent';
+            btnEqual.style.color = '#666';
+            btnEqual.style.fontWeight = '400';
+            btnEqual.style.boxShadow = 'none';
+            btnEqual.classList.remove('active-mode');
+
+            boxEqual.style.display = 'none';
+            boxCustom.style.display = 'block';
+
+            // Auto distribute if empty inputs? 
+            // Better: update target total
+            this.updateCustomTotal();
+        }
+    },
+
+    updateCustomTotal() {
+        // Update Target
+        const targetAmount = parseFloat(document.getElementById('inp-amount').value) || 0;
+        document.getElementById('txt-target-total').innerText = targetAmount.toLocaleString(undefined, { minimumFractionDigits: 2 });
+
+        // Sum Inputs
+        let sum = 0;
+        document.querySelectorAll('.inp-custom-split').forEach(inp => {
+            sum += parseFloat(inp.value) || 0;
+        });
+
+        const sumEl = document.getElementById('txt-custom-total');
+        sumEl.innerText = sum.toLocaleString(undefined, { minimumFractionDigits: 2 });
+
+        const diff = targetAmount - sum;
+        const diffEl = document.getElementById('txt-custom-diff');
+
+        if (Math.abs(diff) < 0.01) {
+            sumEl.style.color = '#4CAF50';
+            diffEl.innerText = 'ยอดตรงกันแล้ว ✅';
+            diffEl.style.color = '#4CAF50';
+        } else if (diff > 0) {
+            sumEl.style.color = '#F44336';
+            diffEl.innerText = `ขาดอีก ${diff.toLocaleString()}`;
+            diffEl.style.color = '#F44336';
+        } else {
+            sumEl.style.color = '#F44336';
+            diffEl.innerText = `เกินมา ${Math.abs(diff).toLocaleString()}`;
+            diffEl.style.color = '#F44336';
+        }
     }
 };
 
