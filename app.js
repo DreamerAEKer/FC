@@ -718,11 +718,14 @@ const ViewManager = {
                         <label style="display:block; margin-bottom:8px; font-weight:500;">หารกับใครบ้าง</label>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
                             ${members.map(m => `
-                                <label class="checkbox-chip" style="display: flex; align-items: center; gap: 8px; padding: 8px; background: #fff; border: 1px solid #eee; border-radius: 8px;">
+                                <label class="checkbox-chip" style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #fff; border: 1px solid #eee; border-radius: 12px; min-height: 50px;">
                                     <input type="checkbox" name="involved" value="${m.id}" ${defaultInvolvedIds.includes(m.id) ? 'checked' : ''}>
-                                    <span>${m.name}</span>
+                                    <span style="font-size: 1rem;">${m.name}</span>
                                 </label>
                             `).join('')}
+                        </div>
+                    </div>
+
                     ${isEdit ? `
                         <div style="display:flex; gap:12px; margin-bottom:80px;">
                             <button type="button" onclick="ViewManager.goBack()" class="btn" style="flex:1; background:#f5f5f5; color:#666; justify-content:center;">ปิด</button>
