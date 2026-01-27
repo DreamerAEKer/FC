@@ -260,3 +260,25 @@ h3 {
     transform: translateX(-80px);
     /* Reveal button */
 }
+
+/* Pulse Animation */
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(98, 0, 238, 0.4);
+    }
+
+    70% {
+        transform: scale(1.05);
+        box-shadow: 0 0 0 10px rgba(98, 0, 238, 0);
+    }
+
+    100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(98, 0, 238, 0);
+    }
+}
+
+.pulse-animation {
+    animation: pulse 2s infinite;
+}

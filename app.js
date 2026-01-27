@@ -329,8 +329,8 @@ const ViewManager = {
                         
                         <!-- Primary: Create New Trip -->
                         <button id="btn-create-trip-hero" class="btn" style="flex: 1; background: white; color: var(--primary-color); border-radius: 20px; padding: 20px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border:none; height: 120px;">
-                            <div style="background: var(--primary-light); padding: 12px; border-radius: 50%;">
-                                <span class="material-icons-round" style="font-size: 32px; color: white;">add</span>
+                            <div class="pulse-animation" style="background: var(--primary-light); padding: 12px; border-radius: 50%;">
+                                <span class="material-icons-round" style="font-size: 32px; color: white;">account_balance_wallet</span>
                             </div>
                             <span style="font-weight: 600; font-size: 1rem;">เปิดทริปใหม่</span>
                         </button>
@@ -561,13 +561,15 @@ const ViewManager = {
                                 <span class="material-icons-round">delete</span>
                             </div>
                             <div class="expense-card-front" 
-                                 ontouchstart="handleSwipeStart(event)" 
-                                 ontouchmove="handleSwipeMove(event)" 
-                                 ontouchend="handleSwipeEnd(event)"
-                                 onmousedown="handleSwipeStart(event)" 
-                                 onmousemove="handleSwipeMove(event)" 
-                                 onmouseup="handleSwipeEnd(event)"
-                                 onmouseleave="handleSwipeEnd(event)"
+                                 style="touch-action: pan-y;"
+                                 ontouchstart="window.handleSwipeStart(event)" 
+                                 ontouchmove="window.handleSwipeMove(event)" 
+                                 ontouchend="window.handleSwipeEnd(event)"
+                                 ontouchcancel="window.handleSwipeEnd(event)"
+                                 onmousedown="window.handleSwipeStart(event)" 
+                                 onmousemove="window.handleSwipeMove(event)" 
+                                 onmouseup="window.handleSwipeEnd(event)"
+                                 onmouseleave="window.handleSwipeEnd(event)"
                                  onclick="if(!this.classList.contains('swiped')) { ViewManager.checkPoint(() => ViewManager.renderTripDetail('${tripId}')); ViewManager.renderAddExpense('${tripId}', '${e.id}'); }">
                                 
                                 <div style="display:flex; justify-content:space-between; align-items:center; padding: 16px;">
@@ -1804,7 +1806,7 @@ const ViewManager = {
                     <div class="input-group" style="margin-bottom: 24px;">
                         <label style="display:block; margin-bottom:8px; font-weight:500;">ชื่อทริป</label>
                         <div style="display: flex; gap: 8px;">
-                            <input type="text" id="inp-trip-name" value="${trip.name}" placeholder="เช่น เที่ยวเชียงใหม่" style="flex:1; padding: 12px; border: 1px solid #ddd; border-radius: 8px;" required>
+                            <input type="text" id="inp-trip-name" value="${trip.name}" placeholder="เช่น เที่ยวเชียงใหม่" style="flex:1; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 1.25rem;" required>
                             <button type="button" id="btn-voice-trip" class="btn" style="background:#eee; padding: 8px 12px; width:44px; justify-content:center;">
                                 <span class="material-icons-round">mic</span>
                             </button>
@@ -2825,16 +2827,29 @@ window.handleSwipeStart = (e) => {
 window.handleSwipeMove = (e) => {
     if (!activeSwipeEl) return;
 
-    const isTouch = e.type === 'touchmove';
-    // Safety check for mouse vs touch
+    // Detect if proper touch event
+    const isTouch = e.type.startsWith('touch');
     if (isTouch && (!e.touches || e.touches.length === 0)) return;
 
     touchCurrentX = isTouch ? e.touches[0].clientX : e.clientX;
     const diff = touchCurrentX - touchStartX;
 
+    // Detect Angle/Direction to block browser scrolling
+    if (Math.abs(diff) > 5) {
+        // Only block browser if we are swiping horizontally more than vertically? 
+        // For simplicity and to fix 'stuck' issue, if user drags horizontally we preventDefault
+        if (isTouch && e.cancelable) {
+            // Note: In some browsers, preventDefault is only allowed if the listener is not passive.
+            // But since we use inline 'ontouchmove', mostly it is treated as passive=false or we can't control it easily.
+            // However, with 'touch-action: pan-y', the browser should already yield.
+            // We add this as a secondary reinforcement.
+            e.preventDefault();
+        }
+    }
+
     // Only allow left swipe (negative diff)
     if (diff < 0) {
-        // Limit drag to -80px (button width) with some resistance
+        // Limit drag to -100px with resistance
         const translate = Math.max(diff, -100);
         activeSwipeEl.style.transform = `translateX(${translate}px)`;
     } else {
