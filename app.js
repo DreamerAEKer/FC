@@ -699,9 +699,18 @@ const ViewManager = {
                                     <span>${m.name}</span>
                                 </label>
                             `).join('')}
-                    <button type="button" onclick="ViewManager.submitExpenseWrapper('${tripId}', '${expenseId || ''}')" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 16px; margin-bottom: 80px; box-shadow: 0 4px 15px rgba(98, 0, 238, 0.4);">
-                        ${isEdit ? 'บันทึกการแก้ไข' : 'บันทึกรายการ'}
-                    </button>
+                    ${isEdit ? `
+                        <div style="display:flex; gap:12px; margin-bottom:80px;">
+                            <button type="button" onclick="ViewManager.goBack()" class="btn" style="flex:1; background:#f5f5f5; color:#666; justify-content:center;">ปิด</button>
+                            <button type="button" onclick="ViewManager.submitExpenseWrapper('${tripId}', '${expenseId}', true)" class="btn btn-primary" style="flex:1; justify-content:center; box-shadow: 0 4px 15px rgba(98, 0, 238, 0.4);">
+                                 <span class="material-icons-round">receipt</span> แสดงการ์ด
+                            </button>
+                        </div>
+                    ` : `
+                        <button type="button" onclick="ViewManager.submitExpenseWrapper('${tripId}', '')" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 16px; margin-bottom: 80px; box-shadow: 0 4px 15px rgba(98, 0, 238, 0.4);">
+                            บันทึกรายการ
+                        </button>
+                    `}
                 </form>
             </div>
         `;
@@ -1061,9 +1070,9 @@ const ViewManager = {
         return "มื้อดึก / ทั่วไป";
     },
 
-    submitExpenseWrapper(tripId, expenseId = null) {
+    submitExpenseWrapper(tripId, expenseId = null, showCard = false) {
         if (expenseId === '') expenseId = null;
-        console.log("Wrapper Clicked for Trip:", tripId, "Expense:", expenseId);
+        console.log("Wrapper Clicked for Trip:", tripId, "Expense:", expenseId, "ShowCard:", showCard);
 
         const amountVal = document.getElementById('inp-amount').value;
         const titleVal = document.getElementById('inp-title').value;
@@ -1078,15 +1087,15 @@ const ViewManager = {
         }
 
         try {
-            this.submitExpense(tripId, expenseId);
+            this.submitExpense(tripId, expenseId, showCard);
         } catch (err) {
             alert('พบข้อผิดพลาด: ' + err.message);
             console.error(err);
         }
     },
 
-    submitExpense(tripId, expenseId = null) {
-        console.log("Starting submitExpense for:", tripId, "EditMode:", !!expenseId);
+    submitExpense(tripId, expenseId = null, showCard = false) {
+        console.log("Starting submitExpense for:", tripId, "EditMode:", !!expenseId, "ShowCard:", showCard);
 
         // 1. Validate Inputs
         const amountEl = document.getElementById('inp-amount');
@@ -1160,18 +1169,16 @@ const ViewManager = {
 
         // 4. Render Card (Safe Wrap)
         try {
-            // Delay slightly to allow UI to update if needed, or just run direct
-            if (confirm('บันทึกแล้ว! สร้างการ์ดสรุปยอดเพื่อส่งให้เพื่อนเลยไหม?')) {
+            if (showCard) {
                 this.renderCardPreview(trip, newExpense);
-            } else {
-                // this.renderTripDetail(tripId); // Old
-                // Just go back to where we came from? 
-                // Usually AddExpense comes from TripDetail. 
-                // If we just goBack(), we go to TripDetail. 
-                // BUT we want to refresh TripDetail to show new expense.
-                // goBack() restores the previous state function, which is () => renderTripDetail(id).
-                // So it should work!
+            } else if (expenseId) {
                 this.goBack();
+            } else {
+                if (confirm('บันทึกแล้ว! สร้างการ์ดสรุปยอดเพื่อส่งให้เพื่อนเลยไหม?')) {
+                    this.renderCardPreview(trip, newExpense);
+                } else {
+                    this.goBack();
+                }
             }
         } catch (e) {
             console.error("Render Card/Detail Error", e);
