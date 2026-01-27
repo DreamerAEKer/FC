@@ -715,7 +715,7 @@ const ViewManager = {
 
                      <!-- Split Among -->
                     <div class="input-group" style="margin-bottom: 32px;">
-                        <label style="display:block; margin-bottom:8px; font-weight:500;">หารกับใครบ้าง</label>
+                        <label style="display:block; margin-bottom:8px; font-weight:500;">หารกับใครบ้าง (ติ๊กถูกทุกคนที่จะหาร)</label>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
                             ${members.map(m => `
                                 <label class="checkbox-chip" style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #fff; border: 1px solid #eee; border-radius: 12px; min-height: 50px;">
