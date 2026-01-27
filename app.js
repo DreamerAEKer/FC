@@ -385,9 +385,33 @@ const ViewManager = {
                     context.drawImage(img, 0, 0);
                     const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
 
-                    const code = jsQR(imageData.data, imageData.width, imageData.height, {
-                        inversionAttempts: "dontInvert",
-                    });
+                    // Helper to scan data
+                    const scan = (data, w, h) => jsQR(data, w, h, { inversionAttempts: "attemptBoth" });
+
+                    // 1. Full Image Scan
+                    let code = scan(imageData.data, imageData.width, imageData.height);
+
+                    // 2. Center Crop Scan (Focus on 50% center)
+                    if (!code) {
+                        const cropW = Math.floor(canvas.width * 0.6);
+                        const cropH = Math.floor(canvas.height * 0.6);
+                        const cropX = Math.floor((canvas.width - cropW) / 2);
+                        const cropY = Math.floor((canvas.height - cropH) / 2);
+
+                        const cropData = context.getImageData(cropX, cropY, cropW, cropH);
+                        code = scan(cropData.data, cropW, cropH);
+                    }
+
+                    // 3. Lower Center Crop Scan (For Saduak Bab Nee Cards where QR is below price)
+                    if (!code) {
+                        const cropW = Math.floor(canvas.width * 0.5);
+                        const cropH = Math.floor(canvas.height * 0.4);
+                        const cropX = Math.floor((canvas.width - cropW) / 2);
+                        const cropY = Math.floor(canvas.height * 0.4); // Start from 40% down
+
+                        const cropData = context.getImageData(cropX, cropY, cropW, cropH);
+                        code = scan(cropData.data, cropW, cropH);
+                    }
 
                     if (code) {
                         console.log("Found QR code", code.data);
@@ -397,7 +421,7 @@ const ViewManager = {
                             this.renderTripList();
                         }
                     } else {
-                        alert('ไม่พบ QR Code ในภาพนี้');
+                        alert('ไม่พบ QR Code ในภาพนี้\nลองครอปภาพให้เหลือเฉพาะ QR Code แล้วลองใหม่นะครับ');
                     }
                 };
                 img.src = event.target.result;
