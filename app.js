@@ -544,7 +544,7 @@ const ViewManager = {
                                  onmousemove="handleSwipeMove(event)" 
                                  onmouseup="handleSwipeEnd(event)"
                                  onmouseleave="handleSwipeEnd(event)"
-                                 onclick="if(!this.classList.contains('swiped')) ViewManager.renderAddExpense('${tripId}', '${e.id}')">
+                                 onclick="if(!this.classList.contains('swiped')) { ViewManager.checkPoint(() => ViewManager.renderTripDetail('${tripId}')); ViewManager.renderAddExpense('${tripId}', '${e.id}'); }">
                                 
                                 <div style="display:flex; justify-content:space-between; align-items:center; padding: 16px;">
                                     <div style="display:flex; align-items:flex-start; gap:12px;">
@@ -615,32 +615,42 @@ const ViewManager = {
         });
     },
 
-    renderAddExpense(tripId) {
+    renderAddExpense(tripId, expenseId = null) {
         const trip = Store.data.trips.find(t => t.id === tripId);
         const members = trip.members.map(id => Store.data.friends.find(f => f.id === id)).filter(Boolean);
+
+        const isEdit = !!expenseId;
+        const editingExpense = isEdit ? trip.expenses.find(e => e.id === expenseId) : null;
+
+        // Defaults
+        const defaultAmount = editingExpense ? editingExpense.amount : '';
+        const defaultTitle = editingExpense ? editingExpense.title : '';
+        const defaultPayerId = editingExpense ? editingExpense.payerId : (members[0] ? members[0].id : null);
+        const defaultInvolvedIds = editingExpense ? editingExpense.involvedIds : members.map(m => m.id);
+        const defaultPhotos = editingExpense ? (editingExpense.attachments || []) : [];
 
         const mainContent = document.getElementById('main-content');
         mainContent.innerHTML = `
             <div id="add-expense-view" class="view active">
-                <div class="trip-header text-center" style="margin-bottom: 24px;">
+                    <div class="trip-header text-center" style="margin-bottom: 24px;">
                     <button class="btn" id="btn-back-trip" style="position: absolute; left: 16px; top: 16px; padding: 8px; width: 40px; height: 40px; justify-content: center; background: white; box-shadow: var(--shadow-sm);">
                         <span class="material-icons-round">arrow_back</span>
                     </button>
-                    <h3>จดค่าใช้จ่าย</h3>
+                    <h3>${isEdit ? 'แก้ไขรายการ' : 'จดค่าใช้จ่าย'}</h3>
                 </div>
 
                 <form id="form-expense">
                     <!-- Amount Input -->
                     <div class="input-group" style="margin-bottom: 24px;">
                         <label style="display:block; margin-bottom:8px; font-weight:500;">จำนวนเงิน</label>
-                        <input type="number" id="inp-amount" placeholder="0.00" style="width: 100%; font-size: 2rem; padding: 12px; border: 2px solid #eee; border-radius: 12px; text-align: center; color: var(--primary-color); font-weight: 600;" required>
+                        <input type="number" id="inp-amount" value="${defaultAmount}" placeholder="0.00" style="width: 100%; font-size: 2rem; padding: 12px; border: 2px solid #eee; border-radius: 12px; text-align: center; color: var(--primary-color); font-weight: 600;" required>
                     </div>
 
                     <!-- Title Input + Voice/Photo -->
                     <div class="input-group" style="margin-bottom: 24px;">
                         <label style="display:block; margin-bottom:8px; font-weight:500;">รายการ</label>
                          <div style="display: flex; gap: 8px;">
-                            <input type="text" id="inp-title" placeholder="ค่าอะไร (เช่น ข้าวซอย)" style="flex:1; padding: 12px; border: 1px solid #ddd; border-radius: 8px;" required>
+                            <input type="text" id="inp-title" value="${defaultTitle}" placeholder="ค่าอะไร (เช่น ข้าวซอย)" style="flex:1; padding: 12px; border: 1px solid #ddd; border-radius: 8px;" required>
                             
                             <!-- Voice Input -->
                             <button type="button" id="btn-voice" class="btn" style="background:#eee; padding: 8px 12px; position:relative;">
@@ -670,7 +680,7 @@ const ViewManager = {
                         <div style="display: flex; overflow-x: auto; gap: 8px; padding-bottom: 8px;">
                             ${members.map((m, i) => `
                                 <label class="radio-chip">
-                                    <input type="radio" name="payer" value="${m.id}" ${i === 0 ? 'checked' : ''} style="display:none;">
+                                    <input type="radio" name="payer" value="${m.id}" ${m.id === defaultPayerId ? 'checked' : ''} style="display:none;">
                                     <div class="chip" style="padding: 8px 16px; background: #f0f0f0; border-radius: 20px; white-space: nowrap; cursor: pointer; border: 2px solid transparent;">
                                         ${m.name}
                                     </div>
@@ -685,12 +695,12 @@ const ViewManager = {
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
                             ${members.map(m => `
                                 <label class="checkbox-chip" style="display: flex; align-items: center; gap: 8px; padding: 8px; background: #fff; border: 1px solid #eee; border-radius: 8px;">
-                                    <input type="checkbox" name="involved" value="${m.id}" checked>
+                                    <input type="checkbox" name="involved" value="${m.id}" ${defaultInvolvedIds.includes(m.id) ? 'checked' : ''}>
                                     <span>${m.name}</span>
                                 </label>
                             `).join('')}
-                    <button type="button" onclick="ViewManager.submitExpenseWrapper('${tripId}')" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 16px; margin-bottom: 80px; box-shadow: 0 4px 15px rgba(98, 0, 238, 0.4); position: relative; z-index: 105;">
-                        บันทึกรายการ
+                    <button type="button" onclick="ViewManager.submitExpenseWrapper('${tripId}', '${expenseId || ''}')" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 16px; margin-bottom: 80px; box-shadow: 0 4px 15px rgba(98, 0, 238, 0.4);">
+                        ${isEdit ? 'บันทึกการแก้ไข' : 'บันทึกรายการ'}
                     </button>
                 </form>
             </div>
@@ -851,6 +861,30 @@ const ViewManager = {
                 });
             }
         });
+
+        // Render Existing Images if Edit
+        if (defaultPhotos && defaultPhotos.length > 0) {
+            const container = document.getElementById('preview-containter');
+            if (container) {
+                defaultPhotos.forEach(src => {
+                    const div = document.createElement('div');
+                    div.className = 'expense-img-preview';
+                    div.style.cssText = "position: relative; flex-shrink: 0; width: 80px; height: 80px; border-radius: 8px; overflow: hidden; border: 1px solid #ddd;";
+                    div.innerHTML = `
+                            <img src="${src}" style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;" onclick="ViewManager.viewImageFull('${src}')">
+                            <button type="button" class="btn-remove-img" style="position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.6); color: white; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; padding: 0; border: none; z-index: 2;">
+                                <span class="material-icons-round" style="font-size: 12px;">close</span>
+                            </button>
+                        `;
+
+                    div.querySelector('.btn-remove-img').addEventListener('click', () => {
+                        div.remove();
+                    });
+
+                    container.appendChild(div);
+                });
+            }
+        }
     },
 
     async performOCR(file) {
@@ -1027,8 +1061,9 @@ const ViewManager = {
         return "มื้อดึก / ทั่วไป";
     },
 
-    submitExpenseWrapper(tripId) {
-        console.log("Wrapper Clicked for Trip:", tripId);
+    submitExpenseWrapper(tripId, expenseId = null) {
+        if (expenseId === '') expenseId = null;
+        console.log("Wrapper Clicked for Trip:", tripId, "Expense:", expenseId);
 
         const amountVal = document.getElementById('inp-amount').value;
         const titleVal = document.getElementById('inp-title').value;
@@ -1043,15 +1078,15 @@ const ViewManager = {
         }
 
         try {
-            this.submitExpense(tripId);
+            this.submitExpense(tripId, expenseId);
         } catch (err) {
             alert('พบข้อผิดพลาด: ' + err.message);
             console.error(err);
         }
     },
 
-    submitExpense(tripId) {
-        console.log("Starting submitExpense for:", tripId);
+    submitExpense(tripId, expenseId = null) {
+        console.log("Starting submitExpense for:", tripId, "EditMode:", !!expenseId);
 
         // 1. Validate Inputs
         const amountEl = document.getElementById('inp-amount');
@@ -1090,13 +1125,13 @@ const ViewManager = {
         }
 
         const newExpense = {
-            id: 'e' + Date.now(),
+            id: expenseId || ('e' + Date.now()),
             tripId,
             title,
             amount,
             payerId,
             involvedIds,
-            timestamp: Date.now(),
+            timestamp: expenseId ? (trip.expenses.find(e => e.id === expenseId)?.timestamp || Date.now()) : Date.now(),
             attachments: attachmentList
         };
 
@@ -1107,7 +1142,19 @@ const ViewManager = {
         }
 
         if (!trip.expenses) trip.expenses = [];
-        trip.expenses.unshift(newExpense);
+
+        if (expenseId) {
+            // Update Existing
+            const idx = trip.expenses.findIndex(e => e.id === expenseId);
+            if (idx !== -1) {
+                trip.expenses[idx] = newExpense;
+            } else {
+                trip.expenses.unshift(newExpense); // Fallback
+            }
+        } else {
+            // New
+            trip.expenses.unshift(newExpense);
+        }
 
         Store.save();
 
