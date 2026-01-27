@@ -1124,6 +1124,12 @@ const ViewManager = {
     submitExpense(tripId, expenseId = null, showCard = false) {
         console.log("Starting submitExpense for:", tripId, "EditMode:", !!expenseId, "ShowCard:", showCard);
 
+        // 0. Find Trip Context (Moved up to avoid TDZ)
+        const trip = Store.data.trips.find(t => t.id === tripId);
+        if (!trip) {
+            throw new Error(`Trip not found for ID: ${tripId}`);
+        }
+
         // 1. Validate Inputs
         const amountEl = document.getElementById('inp-amount');
         const titleEl = document.getElementById('inp-title');
@@ -1171,11 +1177,7 @@ const ViewManager = {
             attachments: attachmentList
         };
 
-        // 3. Find Trip Safe Check
-        const trip = Store.data.trips.find(t => t.id === tripId);
-        if (!trip) {
-            throw new Error(`Trip not found for ID: ${tripId}`);
-        }
+        // 3. Trip Validated at start
 
         if (!trip.expenses) trip.expenses = [];
 
