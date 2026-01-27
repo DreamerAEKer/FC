@@ -73,6 +73,15 @@ const Store = {
         return newTrip;
     },
 
+    deleteTrip(tripId) {
+        if (confirm('ยืนยันลบทริปนี้? การกระทำนี้ไม่สามารถย้อนกลับได้')) {
+            this.data.trips = this.data.trips.filter(t => t.id !== tripId);
+            this.save();
+            return true;
+        }
+        return false;
+    },
+
     deleteExpense(tripId, expenseId) {
         const trip = this.data.trips.find(t => t.id === tripId);
         if (!trip) return;
@@ -102,6 +111,28 @@ const Store = {
         this.data.friends.push(newFriend);
         this.save();
         return newFriend;
+    },
+
+    addTransfer(tripId, from, to, amount) {
+        const trip = this.data.trips.find(t => t.id === tripId);
+        if (!trip) return;
+        if (!trip.transfers) trip.transfers = [];
+
+        trip.transfers.unshift({
+            id: 'tr' + Date.now(),
+            from,
+            to,
+            amount,
+            timestamp: Date.now()
+        });
+        this.save();
+    },
+
+    removeTransfer(tripId, transferId) {
+        const trip = this.data.trips.find(t => t.id === tripId);
+        if (!trip || !trip.transfers) return;
+        trip.transfers = trip.transfers.filter(t => t.id !== transferId);
+        this.save();
     },
 
     // --- Distributed Sync Logic ---
@@ -463,14 +494,30 @@ const ViewManager = {
                 : `background: white;`;
 
             return `
-            <div class="trip-card" onclick="ViewManager.openTrip('${trip.id}')" style="${bgStyle} padding: 16px; border-radius: 12px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; cursor: pointer; position: relative; overflow: hidden;">
-                <div style="position: relative; z-index: 2; max-width: 60%;">
-                    <h4 style="font-size: 1.1rem; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${trip.name}</h4>
-                    <span style="font-size: 0.85rem; color: #666;">${new Date(trip.date).toLocaleDateString('th-TH')}</span>
+            <div class="expense-item-container" style="height: 80px;">
+                <div class="btn-delete-slide" onclick="if(Store.deleteTrip('${trip.id}')) { ViewManager.renderTripList(); }">
+                    <span class="material-icons-round">delete</span>
                 </div>
-                <button class="btn" style="background: rgba(255,255,255,0.8); border-radius: 50%; width: 40px; height: 40px; padding: 0; justify-content: center; position: relative; z-index: 2; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                    <span class="material-icons-round">arrow_forward</span>
-                </button>
+                <div class="expense-card-front" 
+                     style="${bgStyle} height: 100%; border-radius: 12px; padding: 0 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; cursor: pointer; touch-action: pan-y;"
+                     ontouchstart="window.handleSwipeStart(event)" 
+                     ontouchmove="window.handleSwipeMove(event)" 
+                     ontouchend="window.handleSwipeEnd(event)"
+                     ontouchcancel="window.handleSwipeEnd(event)"
+                     onmousedown="window.handleSwipeStart(event)" 
+                     onmousemove="window.handleSwipeMove(event)" 
+                     onmouseup="window.handleSwipeEnd(event)"
+                     onmouseleave="window.handleSwipeEnd(event)"
+                     onclick="if(!this.classList.contains('swiped')) ViewManager.openTrip('${trip.id}')">
+                    
+                    <div style="max-width: 60%;">
+                        <h4 style="font-size: 1.1rem; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${trip.name}</h4>
+                        <span style="font-size: 0.85rem; color: #666;">${new Date(trip.date).toLocaleDateString('th-TH')}</span>
+                    </div>
+                    <div class="btn" style="background: rgba(255,255,255,0.8); border-radius: 50%; width: 40px; height: 40px; padding: 0; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        <span class="material-icons-round">arrow_forward</span>
+                    </div>
+                </div>
             </div>
         `}).join('');
     },
@@ -658,7 +705,7 @@ const ViewManager = {
         const mainContent = document.getElementById('main-content');
         mainContent.innerHTML = `
             <div id="add-expense-view" class="view active">
-                <div class="trip-header text-center" style="margin-bottom: 24px; position:relative;">
+                <div class="trip-header text-center" style="margin-bottom: 24px; position:relative; padding: 0 60px;">
                     <button class="btn" id="btn-back-trip" style="position: absolute; left: 16px; top: -10px; padding: 8px; width: 40px; height: 40px; justify-content: center; background: white; box-shadow: var(--shadow-sm);">
                         <span class="material-icons-round">arrow_back</span>
                     </button>
@@ -681,7 +728,7 @@ const ViewManager = {
                     <div class="input-group" style="margin-bottom: 24px;">
                         <label style="display:block; margin-bottom:8px; font-weight:500;">รายการ</label>
                          <div style="display: flex; gap: 8px;">
-                            <input type="text" id="inp-title" value="${defaultTitle}" placeholder="ค่าอะไร (เช่น ข้าวซอย)" style="flex:1; padding: 12px; border: 1px solid #ddd; border-radius: 8px;" required>
+                            <input type="text" id="inp-title" value="${defaultTitle}" placeholder="ค่าอะไร (เช่น ข้าวซอย)" style="flex:1; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 1.25rem;" required>
                             
                             <!-- Voice Input -->
                             <button type="button" id="btn-voice" class="btn" style="background:#eee; padding: 8px 12px; position:relative;">
@@ -1700,8 +1747,8 @@ const ViewManager = {
         const mainContent = document.getElementById('main-content');
         mainContent.innerHTML = `
              <div id="settle-view" class="view active">
-                <div class="trip-header text-center" style="margin-bottom: 24px;">
-                    <button class="btn" id="btn-back-trip-settle" style="position: absolute; left: 16px; top: 16px; padding: 8px; width: 40px; height: 40px; justify-content: center; background: white; box-shadow: var(--shadow-sm);">
+                <div class="trip-header text-center" style="margin-bottom: 24px; position: relative; padding: 0 60px;">
+                    <button class="btn" id="btn-back-trip-settle" style="position: absolute; left: 16px; top: 0; padding: 8px; width: 40px; height: 40px; justify-content: center; background: white; box-shadow: var(--shadow-sm);">
                         <span class="material-icons-round">arrow_back</span>
                     </button>
                     <h3>สรุปยอดเคลียร์บิล</h3>
@@ -1731,22 +1778,29 @@ const ViewManager = {
 
                 ${trip.transfers && trip.transfers.length > 0 ? `
                 <div style="margin-top: 24px;">
-                    <h4 style="margin-bottom: 12px; color: #666;">รายการปรับเปลี่ยน/โอนแล้ว</h4>
+                    <h4 style="margin-bottom: 12px; color: #4CAF50;">รายการที่เคลียร์แล้ว (Paid)</h4>
                      ${trip.transfers.map(t => {
             const fromName = members.find(m => m.id === t.from)?.name || 'Unknown';
             const toName = members.find(m => m.id === t.to)?.name || 'Unknown';
-            // Add Delete/Undo logic if needed, for now just list
             return `
-                            <div style="padding: 12px; background: #f9f9f9; border-radius: 8px; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; font-size: 0.9rem; color: #666;">
+                            <div style="padding: 12px; background: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 8px; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; font-size: 0.9rem; color: #2E7D32;">
                                 <div>
-                                    <span style="font-weight: 500;">${fromName}</span>
-                                    <span class="material-icons-round" style="font-size: 14px; vertical-align: middle; margin: 0 4px;">arrow_forward</span>
-                                    <span>${toName}</span>
+                                    <div style="display:flex; align-items:center; gap:8px;">
+                                        <span class="material-icons-round" style="color:#4CAF50; font-size:20px;">check_circle</span>
+                                        <div style="display:flex; align-items:center;">
+                                            <span style="font-weight: 500; text-decoration: line-through; opacity: 0.7;">${fromName}</span>
+                                            <span class="material-icons-round" style="font-size: 14px; vertical-align: middle; margin: 0 4px; opacity: 0.5;">arrow_forward</span>
+                                            <span style="text-decoration: line-through; opacity: 0.7;">${toName}</span>
+                                        </div>
+                                    </div>
+                                    <div style="font-size: 0.75rem; color: #388E3C; margin-top: 4px; margin-left: 28px;">
+                                        ${t.timestamp ? new Date(t.timestamp).toLocaleString('th-TH', { hour12: false }) : 'ไม่ระบุเวลา (รายการเก่า)'}
+                                    </div>
                                 </div>
-                                <div>
-                                    ฿${t.amount.toLocaleString()}
-                                    <button onclick="if(confirm('ยกเลิกรายการนี้?')) { window.Store.removeTransfer('${tripId}', '${t.id}'); window.ViewManager.renderSettlement('${tripId}'); }" style="border:none; background:none; color:#f44336; margin-left:8px; cursor:pointer;">
-                                        <span class="material-icons-round" style="font-size:16px;">delete</span>
+                                <div style="display:flex; align-items:center;">
+                                    <span style="font-weight:600;">฿${t.amount.toLocaleString()}</span>
+                                    <button onclick="if(confirm('ยกเลิกรายการนี้?')) { window.Store.removeTransfer('${tripId}', '${t.id}'); window.ViewManager.renderSettlement('${tripId}'); }" style="border:none; background:none; color:#f44336; margin-left:8px; cursor:pointer; opacity: 0.5;">
+                                        <span class="material-icons-round" style="font-size:16px;">close</span>
                                     </button>
                                 </div>
                             </div>
@@ -2103,56 +2157,102 @@ const ViewManager = {
         });
     },
 
-    calculateDebtTransfers(balances, members) {
+    calculateDebtTransfers(balances, members, tripId) {
         // Convert balances to array
         let debtors = [];
         let creditors = [];
 
         for (const [id, amount] of Object.entries(balances)) {
-            // Precision adjustment
             if (Math.abs(amount) < 0.01) continue;
             if (amount > 0) creditors.push({ id, amount });
             if (amount < 0) debtors.push({ id, amount });
         }
 
-        debtors.sort((a, b) => a.amount - b.amount); // Most negative first
-        creditors.sort((a, b) => b.amount - a.amount); // Most positive first
+        debtors.sort((a, b) => a.amount - b.amount);
+        creditors.sort((a, b) => b.amount - a.amount);
 
         let html = '';
-        let i = 0; // debtor index
-        let j = 0; // creditor index
+        let i = 0;
+        let j = 0;
 
         if (debtors.length === 0 && creditors.length === 0) {
             return `<div style="text-align:center; color:#888;">เคลียร์หมดแล้วจ้า!</div>`;
         }
 
+        // Global functions for inline UI
+        window.toggleSettlePanel = (id) => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+        };
+
+        window.updateRemaining = (inpId, total, remainId) => {
+            const val = parseFloat(document.getElementById(inpId).value) || 0;
+            const rem = total - val;
+            const el = document.getElementById(remainId);
+            if (el) {
+                el.innerText = `ค้างอีก: ฿${Math.max(0, rem).toLocaleString()}`;
+                el.style.color = rem > 0 ? '#F44336' : '#4CAF50';
+            }
+        };
+
+        window.confirmSettle = (from, to, inpId, total) => {
+            const val = parseFloat(document.getElementById(inpId).value) || 0;
+            if (val <= 0) return alert('ยอดต้องมากกว่า 0');
+            if (val > total + 1) return alert('ยอดเกินที่ต้องจ่าย'); // Tolerance
+
+            Store.addTransfer(tripId, from, to, val);
+            ViewManager.renderSettlement(tripId);
+        };
+
         while (i < debtors.length && j < creditors.length) {
             let debtor = debtors[i];
             let creditor = creditors[j];
-
-            // The amount to settle is the minimum of what debtor owes and what creditor is owed
             let amount = Math.min(Math.abs(debtor.amount), creditor.amount);
 
-            // Get names
             let dName = members.find(m => m.id === debtor.id)?.name || 'Unknown';
             let cName = members.find(m => m.id === creditor.id)?.name || 'Unknown';
 
+            // Unique ID for UI toggle
+            const uiId = `settle-${i}-${j}`;
+            const inpId = `inp-${uiId}`;
+            const remId = `rem-${uiId}`;
+
             html += `
-                <div style="background: white; padding: 16px; border-radius: 12px; margin-bottom: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: space-between;">
-                    <div style="display:flex; align-items:center; gap:8px;">
-                         <span style="font-weight:500; color: #F44336;">${dName}</span>
-                         <span class="material-icons-round" style="color:#ccc; font-size:16px;">arrow_forward</span>
-                         <span style="font-weight:500; color: #4CAF50;">${cName}</span>
+                <div style="background: white; border-radius: 12px; margin-bottom: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); overflow:hidden;">
+                    <div onclick="window.toggleSettlePanel('${uiId}')" style="padding: 16px; display: flex; align-items: center; justify-content: space-between; cursor:pointer;">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                             <span style="font-weight:500; color: #F44336;">${dName}</span>
+                             <span class="material-icons-round" style="color:#ccc; font-size:16px;">arrow_forward</span>
+                             <span style="font-weight:500; color: #4CAF50;">${cName}</span>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span style="font-weight:600;">฿${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                             <span class="material-icons-round" style="color:#ccc;">expand_more</span>
+                        </div>
                     </div>
-                    <span style="font-weight:600;">฿${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    
+                    <!-- Expanded Actions -->
+                    <div id="${uiId}" style="display:none; background:#fafafa; padding: 12px; border-top: 1px solid #eee;">
+                        <label style="display:block; font-size:0.8rem; color:#666; margin-bottom:4px;">ระบุยอดที่จ่าย (ถ้าจ่ายไม่ครบ)</label>
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <input type="number" id="${inpId}" value="${amount.toFixed(2)}" 
+                                   oninput="window.updateRemaining('${inpId}', ${amount}, '${remId}')"
+                                   style="flex:1; padding:8px; border:1px solid #ddd; border-radius:8px;">
+                            <button onclick="window.confirmSettle('${debtor.id}', '${creditor.id}', '${inpId}', ${amount})" 
+                                    class="btn btn-primary" style="padding: 8px 16px; font-size:0.9rem;">
+                                จ่าย
+                            </button>
+                        </div>
+                        <div id="${remId}" style="margin-top:4px; font-size:0.8rem; color:#4CAF50; text-align:right;">
+                            ยอดเต็มจำนวน (ไม่ค้าง)
+                        </div>
+                    </div>
                 </div>
             `;
 
-            // Update remaining amounts
             debtor.amount += amount;
             creditor.amount -= amount;
 
-            // Move indices if settled
             if (Math.abs(debtor.amount) < 0.01) i++;
             if (creditor.amount < 0.01) j++;
         }
