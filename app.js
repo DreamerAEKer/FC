@@ -298,10 +298,10 @@ const ViewManager = {
             });
         });
 
-        // Quick Add Button
-        document.getElementById('btn-quick-add').addEventListener('click', () => {
-            alert('ฟีเจอร์เพิ่มเร็ว (Quick Add) กำลังมาครับ!');
-        });
+        // Quick Add Button (Removed for now)
+        // document.getElementById('btn-quick-add').addEventListener('click', () => {
+        //     alert('ฟีเจอร์เพิ่มเร็ว (Quick Add) กำลังมาครับ!');
+        // });
 
         // Note: We don't bind hero buttons here because renderHome() will overwrite them.
         // We rely on renderHome() to set up its own listeners.
@@ -1793,9 +1793,7 @@ const ViewManager = {
                                             <span style="text-decoration: line-through; opacity: 0.7;">${toName}</span>
                                         </div>
                                     </div>
-                                    <div style="font-size: 0.75rem; color: #388E3C; margin-top: 4px; margin-left: 28px;">
-                                        ${t.timestamp ? new Date(t.timestamp).toLocaleString('th-TH', { hour12: false }) : 'ไม่ระบุเวลา (รายการเก่า)'}
-                                    </div>
+                                    ${t.timestamp ? `<div style="font-size: 0.75rem; color: #388E3C; margin-top: 4px; margin-left: 28px;">${new Date(t.timestamp).toLocaleString('th-TH', { hour12: false })}</div>` : ''}
                                 </div>
                                 <div style="display:flex; align-items:center;">
                                     <span style="font-weight:600;">฿${t.amount.toLocaleString()}</span>
