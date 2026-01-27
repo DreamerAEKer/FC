@@ -656,10 +656,15 @@ const ViewManager = {
         const mainContent = document.getElementById('main-content');
         mainContent.innerHTML = `
             <div id="add-expense-view" class="view active">
-                    <div class="trip-header text-center" style="margin-bottom: 24px;">
-                    <button class="btn" id="btn-back-trip" style="position: absolute; left: 16px; top: 16px; padding: 8px; width: 40px; height: 40px; justify-content: center; background: white; box-shadow: var(--shadow-sm);">
+                <div class="trip-header text-center" style="margin-bottom: 24px; position:relative;">
+                    <button class="btn" id="btn-back-trip" style="position: absolute; left: 16px; top: -10px; padding: 8px; width: 40px; height: 40px; justify-content: center; background: white; box-shadow: var(--shadow-sm);">
                         <span class="material-icons-round">arrow_back</span>
                     </button>
+                    ${isEdit ? `
+                        <button class="btn" onclick="Store.confirmDeleteExpense('${tripId}', '${expenseId}'); ViewManager.goBack();" style="position: absolute; right: 16px; top: -10px; padding: 8px; width: 40px; height: 40px; justify-content: center; background: #fee; color: #f44336; box-shadow: var(--shadow-sm);">
+                            <span class="material-icons-round">delete</span>
+                        </button>
+                    ` : ''}
                     <h3>${isEdit ? 'แก้ไขรายการ' : 'จดค่าใช้จ่าย'}</h3>
                 </div>
 
