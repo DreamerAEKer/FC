@@ -252,6 +252,9 @@ const ViewManager = {
         window.Store = Store;
         window.ViewManager = this;
 
+        // History Stack
+        this.history = [];
+
         // Bind Nav Buttons
         document.querySelectorAll('.nav-item').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -273,6 +276,28 @@ const ViewManager = {
         // We rely on renderHome() to set up its own listeners.
 
         this.renderHome();
+    },
+
+    /**
+     * Navigation History Helper
+     * Call checkPoint(() => this.renderCurrentView()) BEFORE navigating away.
+     */
+    checkPoint(restoreFn) {
+        if (typeof restoreFn === 'function') {
+            this.history.push(restoreFn);
+            console.log('History Pushed. Stack:', this.history.length);
+        }
+    },
+
+    goBack() {
+        const previousView = this.history.pop();
+        if (previousView) {
+            console.log('Going Back... Stack:', this.history.length);
+            previousView();
+        } else {
+            console.log('History Empty, going Home.');
+            this.renderHome();
+        }
     },
 
     navigateTo(viewName) {
@@ -431,6 +456,8 @@ const ViewManager = {
     },
 
     openTrip(tripId) {
+        // From Home -> Trip
+        this.checkPoint(() => this.renderTripList()); // Or renderHome, but TripList keeps context better if we had scroll
         Store.data.currentTripId = tripId;
         this.renderTripDetail(tripId);
     },
@@ -542,7 +569,7 @@ const ViewManager = {
         // Event Listeners
         document.getElementById('btn-back-home').addEventListener('click', () => {
             Store.data.currentTripId = null;
-            this.renderHome();
+            this.goBack();
         });
 
         // Edit Trip Name & Photo
@@ -569,10 +596,11 @@ const ViewManager = {
 
         document.getElementById('btn-add-expense').addEventListener('click', () => {
             if (!trip.members || trip.members.length === 0) {
-                alert('ต้องมีสมาชิกในทริปก่อนจดค่าใช้จ่าย/nโปรดเพิ่มเพื่อนเข้าทริปก่อน');
+                alert('ต้องมีสมาชิกในทริปก่อนจดค่าใช้จ่าย\nโปรดเพิ่มเพื่อนเข้าทริปก่อน');
                 this.promptAddMemberToTrip(tripId);
                 return;
             }
+            this.checkPoint(() => this.renderTripDetail(tripId));
             this.renderAddExpense(tripId);
         });
 
@@ -582,6 +610,7 @@ const ViewManager = {
                 this.promptAddMemberToTrip(tripId);
                 return;
             }
+            this.checkPoint(() => this.renderTripDetail(tripId));
             this.renderSettlement(tripId);
         });
     },
@@ -709,7 +738,7 @@ const ViewManager = {
 
         // Listeners
         document.getElementById('btn-back-trip').addEventListener('click', () => {
-            this.renderTripDetail(tripId);
+            this.goBack();
         });
 
         // Voice Recognition (Web Speech API)
@@ -1088,7 +1117,14 @@ const ViewManager = {
             if (confirm('บันทึกแล้ว! สร้างการ์ดสรุปยอดเพื่อส่งให้เพื่อนเลยไหม?')) {
                 this.renderCardPreview(trip, newExpense);
             } else {
-                this.renderTripDetail(tripId);
+                // this.renderTripDetail(tripId); // Old
+                // Just go back to where we came from? 
+                // Usually AddExpense comes from TripDetail. 
+                // If we just goBack(), we go to TripDetail. 
+                // BUT we want to refresh TripDetail to show new expense.
+                // goBack() restores the previous state function, which is () => renderTripDetail(id).
+                // So it should work!
+                this.goBack();
             }
         } catch (e) {
             console.error("Render Card/Detail Error", e);
@@ -1266,11 +1302,7 @@ const ViewManager = {
         // Listeners
         // Listeners for Card Preview
         document.getElementById('btn-cancel-card').addEventListener('click', () => {
-            try {
-                this.renderTripDetail(trip.id);
-            } catch (e) {
-                alert('Back Error: ' + e.message);
-            }
+            this.goBack();
         });
 
         document.getElementById('btn-save-card').addEventListener('click', () => {
@@ -2233,6 +2265,7 @@ Object.assign(ViewManager, {
         `;
 
         document.getElementById('btn-add-friend').addEventListener('click', () => {
+            this.checkPoint(() => this.renderFriends());
             this.renderAddEditFriend(); // No ID = Add New
         });
 
@@ -2280,7 +2313,7 @@ Object.assign(ViewManager, {
                         </button>
                     </div>
                 ` : `
-                    <button class="btn" onclick="window.ViewManager.renderAddEditFriend('${friend.id}')" style="background: #f5f5f5; width:36px; height:36px; padding:0; justify-content:center; border-radius:50%; color:#666;">
+                    <button class="btn" onclick="window.ViewManager.checkPoint(() => window.ViewManager.renderFriends()); window.ViewManager.renderAddEditFriend('${friend.id}')" style="background: #f5f5f5; width:36px; height:36px; padding:0; justify-content:center; border-radius:50%; color:#666;">
                          <span class="material-icons-round" style="font-size: 18px;">edit</span>
                     </button>
                 `}
@@ -2430,6 +2463,10 @@ Object.assign(ViewManager, {
             }
         });
 
+
+        // Back Logic
+        document.getElementById('btn-back-friends').addEventListener('click', () => this.goBack());
+        document.getElementById('btn-close-friends-edit').addEventListener('click', () => this.goBack());
 
 
         // Logic: Save
