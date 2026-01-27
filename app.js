@@ -1348,67 +1348,9 @@ const ViewManager = {
         return (len < 10 ? '0' + len : len) + str;
     },
 
-    renderSettlement(tripId) {
-        const trip = Store.data.trips.find(t => t.id === tripId);
-        const members = trip.members.map(id => Store.data.friends.find(f => f.id === id)).filter(Boolean);
 
-        // Calculate Balances
-        const balances = {}; // memberId -> balance
-        trip.members.forEach(id => balances[id] = 0);
 
-        if (trip.expenses) {
-            trip.expenses.forEach(e => {
-                // Payer gets credit
-                balances[e.payerId] += e.amount;
-
-                // Involved people get debt
-                const splitAmount = e.amount / e.involvedIds.length;
-                e.involvedIds.forEach(id => {
-                    balances[id] -= splitAmount;
-                });
-            });
-        }
-
-        const mainContent = document.getElementById('main-content');
-        mainContent.innerHTML = `
-             <div id="settle-view" class="view active">
-                <div class="trip-header text-center" style="margin-bottom: 24px;">
-                    <button class="btn" id="btn-back-trip-settle" style="position: absolute; left: 16px; top: 16px; padding: 8px; width: 40px; height: 40px; justify-content: center; background: white; box-shadow: var(--shadow-sm);">
-                        <span class="material-icons-round">arrow_back</span>
-                    </button>
-                    <h3>สรุปยอดเคลียร์บิล</h3>
-                </div>
-
-                <div style="margin-bottom: 24px;">
-                    <h4 style="margin-bottom: 12px;">สรุปยอดคงเหลือรายคน</h4>
-                    ${members.map(m => {
-            const bal = balances[m.id] || 0;
-            const isPlus = bal >= 0;
-            return `
-                            <div style="display: flex; justify-content: space-between; padding: 12px; background: white; border-radius: 8px; margin-bottom: 8px; border-left: 4px solid ${isPlus ? '#4CAF50' : '#F44336'};">
-                                <span>${m.name}</span>
-                                <span style="font-weight: 600; color: ${isPlus ? '#4CAF50' : '#F44336'};">
-                                    ${isPlus ? '+' : ''}${bal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                </span>
-                            </div>
-                        `;
-        }).join('')}
-                </div>
-
-                <div>
-                    <h4 style="margin-bottom: 12px;">ใครต้องโอนให้ใคร</h4>
-                    <!-- Simple Debt Matching -->
-                    ${this.calculateDebtTransfers(balances, members)}
-                </div>
-             </div>
-        `;
-
-        document.getElementById('btn-back-trip-settle').addEventListener('click', () => {
-            this.renderTripDetail(tripId);
-        });
-    },
-
-    calculateDebtTransfers(balances, members) {
+    calculateDebtTransfers(balances, members, tripId) {
         let debtors = [];
         let creditors = [];
 
@@ -1444,7 +1386,13 @@ const ViewManager = {
                          <span class="material-icons-round" style="color:#ccc; font-size:16px;">arrow_forward</span>
                          <span style="font-weight:500; color: #4CAF50;">${cName}</span>
                     </div>
-                    <span style="font-weight:600;">฿${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="font-weight:600;">฿${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        ${tripId ? `
+                        <button onclick="window.ViewManager.renderEditTransferModal('${tripId}', '${debtor.id}', '${creditor.id}', ${amount})" style="background: #f5f5f5; border:none; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #666;">
+                            <span class="material-icons-round" style="font-size: 16px;">edit</span>
+                        </button>` : ''}
+                    </div>
                 </div>
             `;
 
@@ -1456,6 +1404,59 @@ const ViewManager = {
         }
 
         return html;
+    },
+
+    renderEditTransferModal(tripId, fromId, defaultToId, amount) {
+        const trip = Store.data.trips.find(t => t.id === tripId);
+        const members = trip.members.map(id => Store.data.friends.find(f => f.id === id)).filter(Boolean);
+        const fromMember = members.find(m => m.id === fromId);
+
+        const modalContainer = document.getElementById('modal-container');
+        modalContainer.innerHTML = `
+            <div class="modal-overlay" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1050; display: flex; align-items: center; justify-content: center; padding: 20px;">
+                <div class="modal-card" style="background: white; width: 100%; max-width: 350px; border-radius: 20px; padding: 24px;">
+                    <h3 style="margin-bottom: 20px;">แก้ไขการโอน (เปลี่ยนมือ)</h3>
+                    
+                    <div style="margin-bottom: 16px; font-weight: 500; color: #555;">
+                        โอนจาก: <span style="color: #000;">${fromMember.name}</span>
+                    </div>
+
+                    <div class="input-group" style="margin-bottom: 20px;">
+                        <label style="display:block; margin-bottom:8px; font-weight:500;">โอนให้ใคร (ผู้รับ)</label>
+                        <select id="sel-transfer-to" style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 12px; font-size: 1rem; background: white;">
+                            ${members.filter(m => m.id !== fromId).map(m => `
+                                <option value="${m.id}" ${m.id === defaultToId ? 'selected' : ''}>${m.name}</option>
+                            `).join('')}
+                        </select>
+                    </div>
+
+                    <div class="input-group" style="margin-bottom: 32px;">
+                        <label style="display:block; margin-bottom:8px; font-weight:500;">จำนวนเงิน</label>
+                        <input type="number" id="inp-transfer-amount" value="${amount}" step="0.01" style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 12px; font-size: 1rem;">
+                    </div>
+
+                    <div style="display: flex; gap: 12px;">
+                        <button id="btn-cancel-transfer" class="btn" style="flex: 1; background: #f5f5f5; color: #666; justify-content: center;">ยกเลิก</button>
+                        <button id="btn-save-transfer" class="btn btn-primary" style="flex: 1; justify-content: center;">บันทึก</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('btn-cancel-transfer').addEventListener('click', () => modalContainer.innerHTML = '');
+        document.getElementById('btn-save-transfer').addEventListener('click', () => {
+            const toId = document.getElementById('sel-transfer-to').value;
+            const finalAmount = parseFloat(document.getElementById('inp-transfer-amount').value);
+
+            if (!toId || isNaN(finalAmount) || finalAmount <= 0) {
+                alert('ข้อมูลไม่ถูกต้อง');
+                return;
+            }
+
+            Store.addTransfer(tripId, fromId, toId, finalAmount);
+            this.renderSettlement(tripId);
+            modalContainer.innerHTML = '';
+        });
     },
 
     /**
@@ -1479,6 +1480,16 @@ const ViewManager = {
                 e.involvedIds.forEach(id => {
                     balances[id] -= splitAmount;
                 });
+            });
+        }
+
+        // Apply Manual Transfers (Edit/Override)
+        if (trip.transfers) {
+            trip.transfers.forEach(t => {
+                // Sender (from) has paid off some debt, so their balance increases (e.g. -100 + 100 = 0)
+                balances[t.from] += t.amount;
+                // Receiver (to) has received money, so their "owed" amount decreases (e.g. +100 - 100 = 0)
+                balances[t.to] -= t.amount;
             });
         }
 
@@ -1511,7 +1522,33 @@ const ViewManager = {
                 <div>
                     <h4 style="margin-bottom: 12px;">ใครต้องโอนให้ใคร</h4>
                     <!-- Simple Debt Matching (Greedy Algorithm for display) -->
-                    ${this.calculateDebtTransfers(balances, members)}
+                    ${this.calculateDebtTransfers(balances, members, tripId)}
+                </div>
+
+                ${trip.transfers && trip.transfers.length > 0 ? `
+                <div style="margin-top: 24px;">
+                    <h4 style="margin-bottom: 12px; color: #666;">รายการปรับเปลี่ยน/โอนแล้ว</h4>
+                     ${trip.transfers.map(t => {
+            const fromName = members.find(m => m.id === t.from)?.name || 'Unknown';
+            const toName = members.find(m => m.id === t.to)?.name || 'Unknown';
+            // Add Delete/Undo logic if needed, for now just list
+            return `
+                            <div style="padding: 12px; background: #f9f9f9; border-radius: 8px; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; font-size: 0.9rem; color: #666;">
+                                <div>
+                                    <span style="font-weight: 500;">${fromName}</span>
+                                    <span class="material-icons-round" style="font-size: 14px; vertical-align: middle; margin: 0 4px;">arrow_forward</span>
+                                    <span>${toName}</span>
+                                </div>
+                                <div>
+                                    ฿${t.amount.toLocaleString()}
+                                    <button onclick="if(confirm('ยกเลิกรายการนี้?')) { window.Store.removeTransfer('${tripId}', '${t.id}'); window.ViewManager.renderSettlement('${tripId}'); }" style="border:none; background:none; color:#f44336; margin-left:8px; cursor:pointer;">
+                                        <span class="material-icons-round" style="font-size:16px;">delete</span>
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+        }).join('')}
+                </div>` : ''}
                 </div>
              </div>
         `;
@@ -2140,6 +2177,29 @@ if (typeof Store !== 'undefined') {
             this.save();
             return newFriend;
         },
+
+        addTransfer(tripId, fromId, toId, amount) {
+            const trip = this.data.trips.find(t => t.id === tripId);
+            if (!trip) return;
+            if (!trip.transfers) trip.transfers = [];
+
+            trip.transfers.push({
+                id: 'tx' + Date.now(),
+                from: fromId,
+                to: toId,
+                amount: amount,
+                date: new Date().toISOString()
+            });
+            this.save();
+        },
+
+        removeTransfer(tripId, transferId) {
+            const trip = this.data.trips.find(t => t.id === tripId);
+            if (!trip || !trip.transfers) return;
+
+            trip.transfers = trip.transfers.filter(t => t.id !== transferId);
+            this.save();
+        }
     });
 }
 
