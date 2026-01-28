@@ -282,3 +282,19 @@ h3 {
 .pulse-animation {
     animation: pulse 2s infinite;
 }
+
+/* Global Input Styles */
+input,
+select,
+textarea {
+    font-family: inherit;
+    font-size: 1.2rem;
+    /* User Request: Increase size */
+    color: var(--text-primary);
+}
+
+/* Specific Modal Input Tweaks */
+.modal-card input {
+    font-size: 1.25rem;
+    /* Slightly larger in modals */
+}

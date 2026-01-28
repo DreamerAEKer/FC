@@ -244,7 +244,7 @@ const Store = {
      * Image Compression Helper
      * Returns a Promise resolving to base64 string
      */
-    compressImage(file, maxWidth = 800, quality = 0.7) {
+    compressImage(file, maxWidth = 800, quality = 0.7, mimeType = 'image/jpeg') {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.readAsDataURL(file);
@@ -265,7 +265,7 @@ const Store = {
                     canvas.height = height;
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, width, height);
-                    resolve(canvas.toDataURL('image/jpeg', quality));
+                    resolve(canvas.toDataURL(mimeType, quality));
                 };
                 img.onerror = (err) => reject(err);
             };
@@ -2796,8 +2796,8 @@ Object.assign(ViewManager, {
             if (!file) return;
 
             try {
-                // Resize Max 800 (High Quality for QR)
-                currentQrBase64 = await Store.compressImage(file, 800, 0.9);
+                // Resize Max 800 (High Quality for QR), using PNG (Lossless)
+                currentQrBase64 = await Store.compressImage(file, 800, 1.0, 'image/png');
 
                 // Update Preview
                 const qrArea = document.getElementById('qr-upload-area');
