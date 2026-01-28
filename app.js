@@ -1533,20 +1533,37 @@ const ViewManager = {
             }).then(canvas => {
                 const imgData = canvas.toDataURL('image/png');
 
-                // On Mobile: Show image in modal to Long-Press (Download often fails)
+                // Improved Mobile Save: Show Image + Explicit Download Button
                 const modalContainer = document.getElementById('modal-container');
                 modalContainer.innerHTML = `
                     <div class="modal-overlay" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 2000; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px;">
-                        <h3 style="color: white; margin-bottom: 16px; font-weight: 300;">แตะค้างที่รูปเพื่อบันทึก</h3>
-                        <img src="${imgData}" style="max-width: 100%; max-height: 70vh; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); margin-bottom: 24px;">
-                        <button id="btn-close-preview" class="btn" style="background: white; padding: 12px 24px; border-radius: 30px; min-width: 120px; justify-content: center; font-weight: 600;">
-                            ปิด
-                        </button>
+                        <h3 style="color: white; margin-bottom: 24px; font-weight: 300;">รูปภาพพร้อมแล้ว</h3>
+                        <img src="${imgData}" style="max-width: 100%; max-height: 55vh; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); margin-bottom: 24px;">
+                        
+                        <div style="display: flex; gap: 12px; width: 100%; justify-content: center;">
+                            <button id="btn-close-preview" class="btn" style="background: rgba(255,255,255,0.2); color: white; padding: 12px 24px; border-radius: 30px; min-width: 100px; justify-content: center;">
+                                ปิด
+                            </button>
+                            <button id="btn-download-img" class="btn btn-primary" style="padding: 12px 24px; border-radius: 30px; min-width: 140px; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
+                                <span class="material-icons-round">download</span> บันทึกลงเครื่อง
+                            </button>
+                        </div>
+                        <p style="color: rgba(255,255,255,0.5); font-size: 0.8rem; margin-top: 16px;">หรือแตะค้างที่รูปเพื่อบันทึก</p>
                     </div>
                 `;
 
                 document.getElementById('btn-close-preview').addEventListener('click', () => {
                     modalContainer.innerHTML = '';
+                });
+
+                document.getElementById('btn-download-img').addEventListener('click', () => {
+                    // Trigger Download
+                    const link = document.createElement('a');
+                    link.href = imgData;
+                    link.download = `SaduakBabNee_Slip_${Date.now()}.png`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
                 });
 
                 // Reset Button
