@@ -31,13 +31,18 @@ const Store = {
     },
 
     seedFriends() {
-        this.data.friends = [
-            { id: 'f_muay', name: 'หมวย', phone: '' },
-            { id: 'f_ple', name: 'เปิ้ล', phone: '' },
-            { id: 'f_best', name: 'เบส', phone: '' },
-            { id: 'f_jib', name: 'จิ๊บ', phone: '' },
-            { id: 'f_joy', name: 'จอย', phone: '' },
+        // User Requested Default Order
+        const defaults = [
+            'หมวย', 'พี่แอร์', 'เปิ้ล', 'เบส', 'จิ๊บ',
+            'ขิง', 'ตูน', 'อ๊อฟ', 'จอย', 'พี่เอก'
         ];
+
+        this.data.friends = defaults.map((name, index) => ({
+            id: 'f_def_' + index,
+            name: name,
+            phone: '',
+            photo: null
+        }));
     },
 
     save() {
@@ -2718,15 +2723,16 @@ Object.assign(ViewManager, {
         const mainContent = document.getElementById('main-content');
         mainContent.innerHTML = `
             <div id="add-friend-view" class="view active">
-                <div class="trip-header text-center" style="position: relative; margin-bottom: 24px;">
-                    <button class="btn" id="btn-back-friends" style="position: absolute; left: 16px; top: 16px; padding: 8px; width: 40px; height: 40px; justify-content: center; background: white; box-shadow: var(--shadow-sm);">
+                <div class="trip-header" style="display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; margin-bottom: 24px;">
+                    <button class="btn" id="btn-back-friends" style="width: 40px; height: 40px; padding: 0; justify-content: center; background: white; box-shadow: var(--shadow-sm); border-radius: 50%;">
                         <span class="material-icons-round">arrow_back</span>
                     </button>
-                    <!-- Top Right Close Button -->
-                    <button class="btn" id="btn-close-friends-edit" style="position: absolute; right: 16px; top: 16px; padding: 8px; width: 40px; height: 40px; justify-content: center; background: #f5f5f5; color: #666; border-radius: 50%;">
+                    
+                    <h3 style="margin: 0; flex: 1; text-align: center; font-size: 1.2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 12px;">${isEdit ? 'แก้ไขข้อมูล' : 'เพิ่มเพื่อนใหม่'}</h3>
+
+                    <button class="btn" id="btn-close-friends-edit" style="width: 40px; height: 40px; padding: 0; justify-content: center; background: #f5f5f5; color: #666; border-radius: 50%;">
                         <span class="material-icons-round">close</span>
                     </button>
-                    <h3>${isEdit ? 'แก้ไขข้อมูล' : 'เพิ่มเพื่อนใหม่'}</h3>
                 </div>
 
                 <div style="display:flex; flex-direction:column; align-items:center; margin-bottom: 24px;">
